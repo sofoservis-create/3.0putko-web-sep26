@@ -1,0 +1,65 @@
+User-agent: *
+Disallow: /Admin/
+Disallow: /Admin-Login/
+Disallow: /Admin-Signup/
+Disallow: /Checking-log-Detail/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+Disallow: /Favourite/
+Disallow: /Guest/
+Disallow: /verify-email/
+Disallow: /VerifyEmail/
+Disallow: /reset-password/
+Disallow: /Forget-Password/
+Disallow: /checkout/
+Disallow: /PayPage/
+Disallow: /General-business-conditions/
+Disallow: /Profile/
+
+# Allow important pages
+Allow: /About/
+Allow: /FAQ/
+Allow: /Booking/
+Allow: /host-detail/
+Allow: /listings/
+Allow: /listing-stay-map/
+Allow: /Blog/
+Allow: /Blog-Detail/
+
+# AI Crawlers
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+# Sitemap
+
+Sitemap: https://putko.sk/sitemap.xml
+
+# AI content guide files
+Allow: /llms.txt
+
+# Crawl delay
+
+Crawl-delay: 1

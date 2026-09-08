@@ -1,0 +1,20 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        { "type": "host", "value": "www.putko.sk" }
+      ],
+      "destination": "https://putko.sk/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        { "type": "host", "value": "putko-project.vercel.app" }
+      ],
+      "destination": "https://putko.sk/:path*",
+      "permanent": true
+    }
+  ]
+}

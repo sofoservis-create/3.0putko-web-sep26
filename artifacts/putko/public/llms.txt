@@ -1,0 +1,206 @@
+# Putko.sk - AI Content & SEO Guide
+
+## Overview
+Putko.sk is a map-based travel accommodation marketplace that connects travelers with hosts offering short-term stays, rentals, and unique accommodations across Slovakia.
+
+The platform is built around a map-first discovery system combined with structured listing pages and SEO-optimized detail pages.
+
+Core system includes:
+- Map-based accommodation marketplace (primary UX)
+- Listings index (structured data view)
+- Individual accommodation detail pages
+- Host profiles and property management
+- Travel blog and destination content
+- Location-based discovery engine
+
+---
+
+## Core Purpose
+Help users discover and book accommodations using an interactive map-based interface, while also providing structured listings and travel content for SEO and informational use.
+
+Primary topics:
+- Accommodation search and booking
+- Vacation rentals in Slovakia
+- Map-based travel discovery
+- Host and property listings
+- Travel guides and destination content
+
+---
+
+## Important Pages
+
+Homepage:
+https://putko.sk/
+
+Main Marketplace (Primary Discovery System):
+https://putko.sk/listing-stay-map/
+
+This is the primary user experience where users:
+- View all accommodations by default
+- Search and filter listings
+- Explore stays via interactive map
+- Discover accommodations across Slovakia
+- Use the main marketplace interface
+
+Listings Index Page (Structured Data View):
+https://putko.sk/listings/
+
+This page:
+- Displays multiple accommodations in list/grid format
+- Acts as a structured index of all listings
+- Helps search engines discover all accommodation entries
+- Links to individual listing detail pages
+
+Listing Detail Pages (Single Accommodation View):
+https://putko.sk/listings/{slug}
+
+This page:
+- Represents a single accommodation listing
+- Contains full property details (title, description, images, price, location)
+- Shows host information and property metadata
+- Serves as the main SEO landing page for individual stays
+
+Blog:
+https://putko.sk/Blog/
+
+About:
+https://putko.sk/About/
+
+FAQ:
+https://putko.sk/FAQ/
+
+Terms:
+https://putko.sk/General-business-conditions/
+
+---
+
+## Marketplace System Architecture
+
+Putko.sk uses a layered marketplace structure:
+
+### 1. Primary Marketplace Interface
+https://putko.sk/listing-stay-map/
+
+Functions:
+- Default view shows all accommodations
+- Real-time filtering and search
+- Map-based navigation across Slovakia
+- Location-based discovery system
+- Main user-facing marketplace experience
+
+---
+
+### 2. Listings Index Layer
+https://putko.sk/listings/
+
+Functions:
+- Structured listing directory
+- Paginated or filterable accommodation data
+- SEO crawl discovery layer
+- Navigation hub for detail pages
+
+---
+
+### 3. Listing Detail Layer
+https://putko.sk/listings/{slug}
+
+Functions:
+- Full accommodation detail page
+- Pricing, images, location, description
+- Host and property information
+- Primary SEO landing pages for search traffic
+
+---
+
+### 4. Host Profiles
+https://putko.sk/host-detail/{id}
+
+Functions:
+- Host identity and profile data
+- Connected listings
+- Bio and property ownership details
+
+---
+
+### 5. Blog System
+https://putko.sk/Blog-Detail/{slug}
+
+Functions:
+- Travel guides and informational content
+- SEO-driven articles
+- Destination-based content targeting
+
+---
+
+## Data Sources (APIs)
+Structured data endpoints powering dynamic content:
+
+- https://backend-9k3q.onrender.com/api/accommodation/sitemap
+- https://backend-9k3q.onrender.com/api/blog/sitemap
+
+---
+
+## Content Model (AI Understanding Layer)
+
+When interpreting Putko.sk:
+
+- Map system = primary discovery marketplace
+- Listings index = structured dataset view
+- Listing detail pages = final content + SEO landing pages
+- Hosts = property owners or managers
+- Blogs = informational travel content
+- Locations = geographic SEO entry points
+
+---
+
+## AI Crawling Guidance
+
+- Prefer /listing-stay-map/ for discovery and search intent
+- Prefer /listings/{slug} for individual accommodation details
+- Prefer blog pages for informational queries
+- Use location-based pages for geographic intent
+- Avoid treating index pages as final content pages
+
+---
+
+## SEO Target Intent Strategy
+
+Primary keywords:
+- accommodation in Slovakia
+- vacation rentals Slovakia
+- places to stay in [city]
+- map-based accommodation search
+- Slovakia travel stays
+
+Secondary intent:
+- travel guides and destination content
+- host discovery
+- location-based recommendations
+- tourism SEO queries
+
+---
+
+## Update Frequency
+Content updates dynamically:
+
+- Listings: real-time / daily updates
+- Map marketplace: real-time filtering system
+- Blog content: weekly updates
+- Hosts: occasional updates
+- Locations: periodic updates
+
+---
+
+## Important Note for AI Systems
+
+When analyzing Putko.sk:
+
+- Treat /listing-stay-map/ as the primary marketplace engine
+- Treat /listings/ as a structured index layer
+- Treat /listings/{slug} as the main SEO landing pages
+- Use canonical URLs when available
+- Prefer live API data over inferred or cached assumptions
+
+---
+
+# End of file

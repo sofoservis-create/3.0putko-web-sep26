@@ -1,0 +1,6 @@
+- [Workspace Vite peer contexts](vite-peer-contexts.md) — adding optional Vite peers in one artifact can surface duplicate plugin type identities in another.
+- [Putko map provider](putko-map-provider.md) — keep Google Maps; do not replace it with OpenStreetMap when the browser API key is temporarily absent.
+- [Putko pricing boundaries](putko-pricing-boundaries.md) — special-price end dates are checkout boundaries; preserve the existing pricing architecture.
+- [Putko guest data ownership](putko-guest-data-ownership.md) — guest favorites and stays require authenticated current-user APIs; never trust browser-supplied ownership.
+- [Putko legacy backend isolation](putko-legacy-backend-isolation.md) — patch the Render backend from an isolated origin/main worktree, never from the migrated app branch.
+- [Putko rebuild data platform](putko-rebuild-data-platform.md) — target external PostgreSQL/PostGIS while preserving legacy accommodation contracts through adapters.

@@ -1,0 +1,481 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: test-auth
+    description: Development-only Putko guest authentication
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /test-auth/register:
+    post:
+      operationId: registerTestGuest
+      tags: [test-auth]
+      summary: Register a development-only guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestRegistrationInput"
+      responses:
+        "201":
+          description: Guest created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuestRegistrationResponse"
+        "400":
+          description: Invalid input or duplicate guest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "404":
+          description: Test authentication is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/login:
+    post:
+      operationId: loginTestGuest
+      tags: [test-auth]
+      summary: Log in a development-only guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestLoginInput"
+      responses:
+        "200":
+          description: Guest authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuestLoginResponse"
+        "400":
+          description: Invalid credentials or unverified email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "404":
+          description: Guest not found or test authentication disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/verify-email/{token}:
+    get:
+      operationId: verifyTestGuestEmail
+      tags: [test-auth]
+      summary: Verify a development-only guest email
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "404":
+          description: Test authentication is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/me:
+    get:
+      operationId: getTestGuestProfile
+      tags: [test-auth]
+      summary: Get the authenticated test guest
+      responses:
+        "200":
+          description: Current guest profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuest"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+    patch:
+      operationId: updateTestGuestProfile
+      tags: [test-auth]
+      summary: Update the authenticated test guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestProfileUpdate"
+      responses:
+        "200":
+          description: Updated guest profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuest"
+        "400":
+          description: Invalid profile data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/change-password:
+    post:
+      operationId: changeTestGuestPassword
+      tags: [test-auth]
+      summary: Change the authenticated test guest password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestPasswordChange"
+      responses:
+        "200":
+          description: Password changed and sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "400":
+          description: Invalid current or new password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/host-activation:
+    post:
+      operationId: activateTestGuestHostMode
+      tags: [test-auth]
+      summary: Add development-only host capability to the current traveler
+      responses:
+        "200":
+          description: Host capability activated or already active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuest"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/mode:
+    patch:
+      operationId: switchTestGuestMode
+      tags: [test-auth]
+      summary: Switch the current development session between travel and host modes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestModeInput"
+      responses:
+        "200":
+          description: Current profile with the updated active mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuest"
+        "400":
+          description: Host capability has not been activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/logout:
+    post:
+      operationId: logoutTestGuest
+      tags: [test-auth]
+      summary: Revoke the current test guest session
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+  /test-auth/favorites:
+    get:
+      operationId: getTestGuestFavorites
+      tags: [test-auth]
+      summary: List favorite accommodation IDs for the authenticated test guest
+      responses:
+        "200":
+          description: Favorite accommodation IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuestFavorites"
+        "401":
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+    post:
+      operationId: addTestGuestFavorite
+      tags: [test-auth]
+      summary: Save an accommodation for the authenticated test guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGuestFavoriteInput"
+      responses:
+        "200":
+          description: Updated favorite accommodation IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuestFavorites"
+  /test-auth/favorites/{accommodationId}:
+    delete:
+      operationId: removeTestGuestFavorite
+      tags: [test-auth]
+      summary: Remove a saved accommodation for the authenticated test guest
+      parameters:
+        - name: accommodationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Updated favorite accommodation IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGuestFavorites"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    AuthMessage:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    TestGuestRegistrationInput:
+      type: object
+      required: [name, lastName, email, phoneNumber, password, gender, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        phoneNumber:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+        password:
+          type: string
+          minLength: 6
+        gender:
+          type: string
+          enum: [male, female, other]
+        role:
+          type: string
+          enum: [guest]
+        language:
+          type: string
+        lang:
+          type: string
+          enum: [en, sk]
+    TestGuestRegistrationResponse:
+      type: object
+      required: [message, verificationToken]
+      properties:
+        message:
+          type: string
+        verificationToken:
+          type: string
+    TestGuestLoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        password:
+          type: string
+          minLength: 1
+        lang:
+          type: string
+          enum: [en, sk]
+    TestGuest:
+      type: object
+      required: [id, name, lastName, email, phoneNumber, gender, language, isVerified, capabilities, activeMode, hostActivatedAt]
+      properties:
+        id:
+          type: string
+          pattern: '^[0-9a-fA-F-]{36}$'
+        name:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        phoneNumber:
+          type: string
+        gender:
+          type: string
+        language:
+          type: string
+        isVerified:
+          type: boolean
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [guest, host]
+        activeMode:
+          type: string
+          enum: [guest, host]
+        hostActivatedAt:
+          type: ["string", "null"]
+          format: date-time
+    TestGuestLoginResponse:
+      type: object
+      required: [status, message, token, data, role]
+      properties:
+        status:
+          type: boolean
+        message:
+          type: string
+        token:
+          type: string
+        data:
+          $ref: "#/components/schemas/TestGuest"
+        role:
+          type: string
+          enum: [guest, host]
+    TestGuestModeInput:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [guest, host]
+    TestGuestProfileUpdate:
+      type: object
+      required: [name, lastName, phoneNumber, gender, language]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        phoneNumber:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+        gender:
+          type: string
+          enum: [male, female, other]
+        language:
+          type: string
+          enum: [Slovak, English]
+    TestGuestPasswordChange:
+      type: object
+      required: [currentPassword, newPassword, lang]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 8
+        lang:
+          type: string
+          enum: [en, sk]
+    TestGuestFavoriteInput:
+      type: object
+      required: [accommodationId]
+      properties:
+        accommodationId:
+          type: string
+          minLength: 1
+          maxLength: 100
+    TestGuestFavorites:
+      type: object
+      required: [favorites]
+      properties:
+        favorites:
+          type: array
+          items:
+            type: string
+

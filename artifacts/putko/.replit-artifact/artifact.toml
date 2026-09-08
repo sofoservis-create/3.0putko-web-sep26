@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Putko"
+description = "A multilingual accommodation marketplace for discovering stays, booking homes, managing reservations, and publishing travel content across Slovakia."
+version = "1.0.0"
+id = "artifacts/putko"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21864
+
+[services.development]
+run = "pnpm --filter @workspace/putko run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/putko", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/putko/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21864"
+BASE_PATH = "/"

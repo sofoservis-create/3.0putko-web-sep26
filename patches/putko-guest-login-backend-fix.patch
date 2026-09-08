@@ -1,0 +1,27 @@
+diff --git a/backend/Controllers/authController.js b/backend/Controllers/authController.js
+index 04b6998..7924c40 100644
+--- a/backend/Controllers/authController.js
++++ b/backend/Controllers/authController.js
+@@ -173,12 +173,16 @@ export const login = async (req, res) => {
+       return res.status(400).json({ status: false, message: t.invalidCredentials });
+     }
+ 
+-    // Save login history separately
+-    await LoginHistory.create({
+-      hostId: host._id,
+-      ip: req.ip,
+-      userAgent: req.get("User-Agent"),
+-    });
++    // LoginHistory currently belongs to hosts. Guests do not have a Host
++    // document, so attempting to read host._id prevents an otherwise valid
++    // guest login from reaching token generation.
++    if (user.role === "host") {
++      await LoginHistory.create({
++        hostId: user._id,
++        ip: req.ip,
++        userAgent: req.get("User-Agent"),
++      });
++    }
+ 
+     // Generate authentication token
+     const token = generateToken(user);

@@ -1,0 +1,126 @@
+## Goal
+
+Create an identical copy of the current host/accommodation management system, but redesign the entire **host onboarding and accommodation creation flow**.
+
+The new flow should be a **guided, card-based onboarding experience**, similar in concept to Airbnb.
+
+## Main Requirement
+
+A host should no longer create an accommodation by filling in a few basic fields and then having to navigate through multiple separate sidebar sections to finish the setup.
+
+Instead, the entire accommodation setup should work as **one guided end-to-end flow**.
+
+The host should be guided step by step until the accommodation is fully configured.
+
+## Accommodation Completion Progress
+
+Each accommodation must have a clear **completion percentage/progress indicator**.
+
+For example:
+
+* 20% complete
+* 50% complete
+* 80% complete
+* 100% complete
+
+The percentage should reflect how much of the required accommodation setup has been completed.
+
+An accommodation must **not be allowed to go live until all required setup steps are completed**.
+
+Only when the accommodation reaches **100% completion** should the host be able to publish it and make it live on the platform.
+
+## Draft Accommodation
+
+The host must be able to save progress and continue later.
+
+However, an unfinished accommodation should remain a **draft**.
+
+A draft accommodation must never accidentally appear publicly on the marketplace.
+
+Clearly distinguish between states such as:
+
+* Draft / incomplete
+* Ready to publish
+* Live
+
+Do not allow a partially completed accommodation to become live.
+
+## Guided Card-Based Setup
+
+Redesign the accommodation setup into a guided sequence of cards/screens.
+
+Instead of forcing the host to search through different sections of the sidebar, all setup steps should be accessible from this guided onboarding flow.
+
+This includes the existing accommodation setup functionality, including things such as:
+
+* accommodation information
+* accommodation details
+* photos
+* pricing
+* availability
+* calendar setup
+* calendar synchronization
+* and any other existing configuration currently required before an accommodation can operate properly
+
+Do not remove existing functionality.
+
+Reorganize the existing functionality into the new guided onboarding experience.
+
+## Calendar Synchronization
+
+Calendar synchronization should be included directly inside the accommodation onboarding flow.
+
+The host should not have to:
+
+1. create the accommodation,
+2. leave the accommodation setup,
+3. navigate to another sidebar section,
+4. find calendar synchronization,
+5. connect the calendar separately.
+
+Instead, calendar setup/synchronization should appear as one of the guided setup steps for that accommodation.
+
+## Accommodation Preview
+
+While setting up the accommodation, the host should have access to a **Preview** function.
+
+The preview should show the host how the accommodation listing will look to guests once published.
+
+The host should be able to use Preview even while the accommodation is still a draft.
+
+Preview must not publish the accommodation.
+
+## Host Registration + First Accommodation
+
+Audit and redesign the complete flow starting from:
+
+**Host registration → host onboarding → accommodation creation → accommodation configuration → preview → publication**
+
+The experience should feel like one continuous guided process.
+
+A new host should not finish registration and then be dropped into a dashboard where they need to figure out which sidebar sections they need to visit next.
+
+Guide them directly through everything required to create their first complete accommodation.
+
+## UX Principle
+
+The system should always make it obvious:
+
+* what has already been completed,
+* what is still missing,
+* what step the host is currently on,
+* how complete the accommodation is,
+* what prevents the accommodation from going live,
+* and what the host needs to do next.
+
+The host should never need to guess where they need to go in the application to finish setting up an accommodation.
+
+## Important
+
+Do not redesign unrelated parts of the platform.
+
+Keep the existing functionality and data model wherever possible.
+
+The main objective is to **restructure the host onboarding and accommodation creation experience** into one coherent guided flow instead of a fragmented setup spread across different sidebar sections.
+
+Before implementing, audit the current host registration, accommodation creation, accommodation editing, calendar synchronization, publishing logic, and sidebar structure so the new flow incorporates all existing required functionality without creating duplicate systems.

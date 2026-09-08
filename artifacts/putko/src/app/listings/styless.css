@@ -1,0 +1,252 @@
+.react-datepicker {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem; /* equivalent to gap-10 */
+}
+
+@media (min-width: 768px) {
+  .react-datepicker {
+    grid-template-columns: repeat(2, 1fr); /* md:grid-cols-2 */
+  }
+}
+
+.react-datepicker__aria-live {
+  display: none; /* hidden */
+}
+
+.react-datepicker__month-container {
+  text-align: center; /* text-center */
+}
+
+.react-datepicker__current-month {
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 600; /* font-semibold */
+  color: #111827; /* text-gray-900 */
+}
+
+.react-datepicker__day-names {
+  display: none; /* Hide day headers */
+}
+
+.react-datepicker__month {
+  margin-top: 1.25rem; /* mt-5 */
+}
+
+.react-datepicker__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* grid-cols-7 */
+  margin: 0.125rem 0; /* my-0.5 */
+}
+
+.react-datepicker__day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 0.875rem; /* text-sm */
+  cursor: pointer;
+}
+
+.react-datepicker__day:empty {
+  opacity: 0; /* empty:opacity-0 */
+  cursor: auto; /* empty:cursor-auto */
+  background-color: transparent; /* empty:bg-transparent */
+}
+
+.react-datepicker__day span {
+  border-radius: 9999px; /* rounded-full */
+}
+
+.react-datepicker__day:hover span {
+  background-color: #22C55E; /* hover:bg-gray-100 */
+}
+
+.listing-date-status--unavailable .react-datepicker__day_span,
+.listing-date-unavailable-swatch {
+  position: relative;
+  color: #5f6763;
+  background-color: #e7ebe9;
+  border: 1px solid #cbd2ce;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.listing-date-status--unavailable .react-datepicker__day_span::after,
+.listing-date-unavailable-swatch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.65rem;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: #7a837e;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+.react-datepicker__day:hover .listing-date-status--unavailable .react-datepicker__day_span,
+.react-datepicker__day--disabled:hover .react-datepicker__day_span {
+  color: #5f6763;
+  background-color: #e7ebe9;
+}
+
+.listing-date-status--past .react-datepicker__day_span,
+.react-datepicker__day:hover .listing-date-status--past .react-datepicker__day_span {
+  color: #b9bfbc;
+  background-color: transparent;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.listing-date-unavailable-swatch {
+  display: flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.section-date-range .react-datepicker__day--in-range,
+.section-date-range .react-datepicker__day--in-selecting-range {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+.section-date-range .react-datepicker__day--in-range .react-datepicker__day_span,
+.section-date-range .react-datepicker__day--in-selecting-range .react-datepicker__day_span {
+  color: #173f32;
+  background-color: #d2f8e8;
+}
+
+.section-date-range .react-datepicker__day--selected .react-datepicker__day_span,
+.section-date-range .react-datepicker__day--range-start .react-datepicker__day_span,
+.section-date-range .react-datepicker__day--range-end .react-datepicker__day_span,
+.section-date-range .react-datepicker__day--selecting-range-start .react-datepicker__day_span,
+.section-date-range .react-datepicker__day--selecting-range-end .react-datepicker__day_span {
+  color: white;
+  border-radius: 9999px;
+  background-color: #319a7a;
+}
+
+.listing-reservation-calendar .react-datepicker__day--in-range,
+.listing-reservation-calendar .react-datepicker__day--in-selecting-range,
+.listing-reservation-calendar .react-datepicker__day--selected,
+.listing-reservation-calendar .react-datepicker__day--range-start,
+.listing-reservation-calendar .react-datepicker__day--range-end,
+.listing-reservation-calendar .react-datepicker__day--selecting-range-start,
+.listing-reservation-calendar .react-datepicker__day--selecting-range-end {
+  color: inherit;
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+.listing-reservation-calendar .react-datepicker__day--in-range .react-datepicker__day_span,
+.listing-reservation-calendar .react-datepicker__day--in-selecting-range .react-datepicker__day_span {
+  color: #173f32;
+  background-color: #d2f8e8;
+}
+
+.listing-reservation-calendar .react-datepicker__day--selected .react-datepicker__day_span,
+.listing-reservation-calendar .react-datepicker__day--range-start .react-datepicker__day_span,
+.listing-reservation-calendar .react-datepicker__day--range-end .react-datepicker__day_span,
+.listing-reservation-calendar .react-datepicker__day--selecting-range-start .react-datepicker__day_span,
+.listing-reservation-calendar .react-datepicker__day--selecting-range-end .react-datepicker__day_span {
+  color: #fff;
+  background-color: #319a7a;
+}
+
+@media (max-width: 767px) {
+  .checkout-date-calendar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .checkout-date-calendar .react-datepicker__month-container + .react-datepicker__month-container {
+    display: none;
+  }
+}
+
+.checkout-date-calendar .react-datepicker__day-names {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-top: 1.25rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.checkout-date-calendar .react-datepicker__day-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+}
+
+.checkout-date-calendar .react-datepicker__day-name::after {
+  font-size: 0.75rem;
+}
+
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(1)::after { content: "Po"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(2)::after { content: "Ut"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(3)::after { content: "St"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(4)::after { content: "Št"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(5)::after { content: "Pi"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(6)::after { content: "So"; }
+.checkout-date-calendar--sk .react-datepicker__day-name:nth-child(7)::after { content: "Ne"; }
+
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(1)::after { content: "Mo"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(2)::after { content: "Tu"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(3)::after { content: "We"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(4)::after { content: "Th"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(5)::after { content: "Fr"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(6)::after { content: "Sa"; }
+.checkout-date-calendar--en .react-datepicker__day-name:nth-child(7)::after { content: "Su"; }
+
+.react-datepicker__day--disabled {
+  color: #9ca3af; /* text-neutral-400 */
+}
+
+.react-datepicker__day--disabled.dark {
+  color: #6b7280; /* dark:text-neutral-500 */
+}
+
+.react-datepicker__day_span {
+  display: flex;
+  height: 46px; /* h-[46px] */
+  width: 46px; /* w-[46px] */
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px; /* rounded-full */
+}
+
+/* addListingDatePickerExclude */
+.addListingDatePickerExclude .react-datepicker__day--disabled {
+  position: relative;
+  background-color: #f3f4f6; /* bg-gray-100 */
+  border-radius: 0; /* rounded-none */
+}
+
+.addListingDatePickerExclude .react-datepicker__day--disabled.dark {
+  background-color: rgba(55, 65, 81, 0.5); /* dark:bg-gray-700/50 */
+}
+
+.addListingDatePickerExclude .react-datepicker__day--disabled::after {
+  content: "";
+  position: absolute;
+  display: block;
+  height: 100%;
+  transform: rotate(45deg);
+  border-left: 1px solid #d1d5db; /* border-neutral-300 */
+}
+
+.addListingDatePickerExclude .react-datepicker__day--disabled.dark::after {
+  border-color: #374151; /* dark:border-neutral-700 */
+} 
+ 
