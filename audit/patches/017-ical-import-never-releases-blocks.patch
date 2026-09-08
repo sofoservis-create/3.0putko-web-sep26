@@ -1,0 +1,134 @@
+diff --git a/.migration-backup/backend/Controllers/AccommodationController.js b/.migration-backup/backend/Controllers/AccommodationController.js
+index ef8a09b..e826515 100644
+--- a/.migration-backup/backend/Controllers/AccommodationController.js
++++ b/.migration-backup/backend/Controllers/AccommodationController.js
+@@ -1430,6 +1430,24 @@ export const syncBookings = async () => {
+           const events = Object.values(parsedData).filter(event => event.type === "VEVENT");
+ 
+           let addedCount = 0;
++          // Every UID this feed still carries. Anything previously imported from
++          // this feed and NOT in here has been deleted or moved upstream, and
++          // must give its dates back — see the reconciliation below.
++          const seenUids = new Set();
++
++          // RRULE is not expanded. `ical@0.8` exposes `event.rrule` but does not
++          // materialise the occurrences, so only the FIRST instance of a
++          // recurring block is imported and every later one is silently dropped
++          // — dates the channel considers blocked stay bookable here, which is a
++          // direct route to a double booking. Flagged loudly rather than
++          // pretended away; expanding them needs a recurrence library.
++          const recurring = events.filter((event) => event.rrule);
++          if (recurring.length) {
++            console.error(
++              `⚠️  ${name || _id} / ${feed.label} — ${recurring.length} recurring event(s) ` +
++                `imported as a single occurrence. Later occurrences are NOT blocked.`
++            );
++          }
+ 
+           for (const event of events) {
+             const normalizeDate = (date) => {
+@@ -1449,8 +1467,20 @@ export const syncBookings = async () => {
+ 
+             const guestName = (event.summary || "ICS Guest").trim();
+             const status = "booked";
++            // RFC 5545 §3.8.4.7: UID is the stable identity of an event across
++            // updates. Matching on (start, end, summary, status) instead meant an
++            // event whose DATES changed upstream was imported as a NEW row while
++            // the old row stayed forever — the nights it used to cover were then
++            // blocked permanently, on a listing nobody was booking. And a channel
++            // that varies its summary text ("Reserved" vs "CLOSED - Not
++            // available") produced a duplicate on every single sync.
++            const uid = event.uid ? String(event.uid) : null;
++            if (uid) seenUids.add(uid);
+ 
+             const exists = occupancyCalendar.some(entry => {
++              // Prefer identity when both sides have one.
++              if (uid && entry.icsUid) return String(entry.icsUid) === uid;
++
+               const entryStart = normalizeDate(entry.startDate);
+               const entryEnd = normalizeDate(entry.endDate);
+ 
+@@ -1492,16 +1522,61 @@ export const syncBookings = async () => {
+                 guestName,
+                 status,
+                 source: 'ics',
++                icsUid: uid || undefined,
+                 calendarSyncId: feed.feedId || undefined,
+               });
+ 
+               updated = true;
+               addedCount++;
++            } else if (uid) {
++              // Known event: move it if the dates changed upstream, rather than
++              // leaving the old range blocked and adding a second row.
++              const existing = occupancyCalendar.find(
++                (entry) => String(entry.icsUid || "") === uid
++              );
++              if (existing && normalizeDate(existing.startDate) !== newStart) {
++                existing.startDate = new Date(`${newStart}T00:00:00Z`);
++                existing.endDate = new Date(`${newEnd}T00:00:00Z`);
++                updated = true;
++              } else if (existing && normalizeDate(existing.endDate) !== newEnd) {
++                existing.endDate = new Date(`${newEnd}T00:00:00Z`);
++                updated = true;
++              }
+             } else {
+               console.log('✅ Duplicate booking found. Skipping.');
+             }
+           }
+ 
++          // DELETION RECONCILIATION.
++          //
++          // The importer only ever ADDED. When a guest cancelled on Airbnb the
++          // event disappeared from the feed, and the block here stayed — for
++          // good. Nights the host could sell were silently dead, with nothing in
++          // the UI to say why, and the loss compounded with every cancellation.
++          //
++          // Only rows this feed created and that carry a UID are considered:
++          // rows imported before UIDs were recorded cannot be matched against
++          // the feed, so removing them would be a guess, and a wrong guess here
++          // frees dates that are genuinely booked.
++          if (feed.feedId) {
++            const before = occupancyCalendar.length;
++            for (let i = occupancyCalendar.length - 1; i >= 0; i--) {
++              const entry = occupancyCalendar[i];
++              if (entry.source !== 'ics') continue;
++              if (String(entry.calendarSyncId || '') !== String(feed.feedId)) continue;
++              if (!entry.icsUid) continue;
++              if (seenUids.has(String(entry.icsUid))) continue;
++              occupancyCalendar.splice(i, 1);
++            }
++            const removed = before - occupancyCalendar.length;
++            if (removed) {
++              updated = true;
++              console.log(
++                `➖ ${name || _id} / ${feed.label} — released ${removed} block(s) no longer in the feed.`
++              );
++            }
++          }
++
+           if (feed.doc) {
+             feed.doc.lastSyncAt = new Date();
+             feed.doc.lastSyncStatus = 'ok';
+diff --git a/.migration-backup/backend/models/Accommodation.js b/.migration-backup/backend/models/Accommodation.js
+index 03fc160..b5edb0a 100644
+--- a/.migration-backup/backend/models/Accommodation.js
++++ b/.migration-backup/backend/models/Accommodation.js
+@@ -552,6 +552,17 @@ const accommodationSchema = new mongoose.Schema({
+         type: mongoose.Schema.Types.ObjectId,
+         required: false,
+       },
++      // The upstream event's RFC 5545 UID, for rows imported from a feed.
++      //
++      // Without it the importer could not tell an event that MOVED from one that
++      // was ADDED, and could not tell a deleted event from one it had simply not
++      // seen — so imported blocks accumulated and were never released. See
++      // syncBookings in Controllers/AccommodationController.js.
++      icsUid: {
++        type: String,
++        required: false,
++        index: true,
++      },
+     }
+   ],
+   views: { type: Number, default: 0 },

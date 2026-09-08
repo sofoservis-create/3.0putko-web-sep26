@@ -1,0 +1,87 @@
+diff --git a/.migration-backup/backend/Controllers/AccommodationController.js b/.migration-backup/backend/Controllers/AccommodationController.js
+index ef8a09b..c9411d4 100644
+--- a/.migration-backup/backend/Controllers/AccommodationController.js
++++ b/.migration-backup/backend/Controllers/AccommodationController.js
+@@ -1253,9 +1253,20 @@ export const deleteAccommodationImages = async (req, res) => {
+ 
+ export const generateICS = async (req, res) => {
+   const { id } = req.params;
++  const token = req.query.token || req.params.token;
+ 
+   try {
+-    const accommodation = await Accommodation.findById(id);
++    // Keyed on the secret, not on the listing id. The id is public and
++    // enumerable, so the old route handed anyone the occupancy of any property.
++    const accommodation = token
++      ? await Accommodation.findOne({ _id: id, icalExportToken: String(token) }).select(
++          "+icalExportToken"
++        )
++      : null;
++
++    if (!token) {
++      return res.status(401).json({ error: "A calendar token is required" });
++    }
+ 
+     // Always respond in ICS format, even if empty
+     if (!accommodation) {
+@@ -1274,8 +1285,14 @@ END:VCALENDAR`);
+       return {
+         start: [startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate()],
+         end: [endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate()],
+-        title: `Reserved - ${entry.guestName || "Guest"}`,
++        // No guest identity in an outbound feed. The consumers of this file are
++        // Airbnb, Booking.com and the like; they need the DATES blocked, and
++        // nothing else. Publishing "Reserved - Jana Nováková" to a third-party
++        // channel is a disclosure of personal data with no basis for it, and it
++        // is what the old title did.
++        title: "Reserved",
+         description: `Status: ${entry.status || "Unknown"}`,
++        uid: `${entry._id}@putko.sk`,
+       };
+     });
+ 
+diff --git a/.migration-backup/backend/Routes/AccommodationRoutes.js b/.migration-backup/backend/Routes/AccommodationRoutes.js
+index 95ddd64..5d54020 100644
+--- a/.migration-backup/backend/Routes/AccommodationRoutes.js
++++ b/.migration-backup/backend/Routes/AccommodationRoutes.js
+@@ -55,6 +55,9 @@ router.get("/accommodation/listing-stats", getListingStats);
+ // Search accommodations by category (this should be first)
+ router.get("/accommodations/searching", searchAccommodationsByCategory);
+ router.get("/accommodation/search", searchAccommodationsByCategorys);
++// The token may travel as a path segment (what most channel managers accept in
++// a subscription URL) or as ?token=. Either way it is required — see generateICS.
++router.get("/accommodation/:id/calendar/:token.ics", generateICS);
+ router.get("/accommodation/:id/calendar.ics", generateICS);
+ router.post("/accommodation", createAccommodation);
+ // Whether a host may publish listings yet, and what is still missing.
+diff --git a/.migration-backup/backend/models/Accommodation.js b/.migration-backup/backend/models/Accommodation.js
+index 03fc160..95c725a 100644
+--- a/.migration-backup/backend/models/Accommodation.js
++++ b/.migration-backup/backend/models/Accommodation.js
+@@ -1,4 +1,5 @@
+ import mongoose from 'mongoose';
++import crypto from 'crypto';
+ import { validateCustomTiers } from '../utils/cancellationPolicy.js';
+ 
+ const accommodationSchema = new mongoose.Schema({
+@@ -250,6 +251,20 @@ const accommodationSchema = new mongoose.Schema({
+    * Generated after draft autosave / first feed add.
+    */
+   icalExportUrl: { type: String },
++  /**
++   * Secret for the outbound feed.
++   *
++   * The export used to be served at /api/accommodation/<listing id>/calendar.ics
++   * with no credential at all, and a Mongo ObjectId is a timestamp plus a
++   * counter — enumerable, and published on every listing page besides. Anyone
++   * could pull any property's occupancy, and the events carried the GUEST'S
++   * NAME. This is what the URL is keyed on instead.
++   */
++  icalExportToken: {
++    type: String,
++    select: false,
++    index: true,
++  },
+ 
+   locationDetails: {
+     streetAndNumber: {

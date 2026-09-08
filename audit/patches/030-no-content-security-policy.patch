@@ -1,0 +1,39 @@
+diff --git a/.migration-backup/frontend/next.config.mjs b/.migration-backup/frontend/next.config.mjs
+index 740253f..ae7bd8e 100644
+--- a/.migration-backup/frontend/next.config.mjs
++++ b/.migration-backup/frontend/next.config.mjs
+@@ -187,6 +187,34 @@ const nextConfig = {
+           key: "Permissions-Policy",
+           value: 
+             "geolocation=(self), camera=(self), clipboard-read=(self), clipboard-write=(self), web-share=(self), fullscreen=(self), autoplay=(self)",
++        },
++
++        // There was no Content-Security-Policy at all, so the only thing
++        // standing between a stored-XSS payload and a session token was not
++        // having one. Listing fields — including the images array — are written
++        // through the API and rendered on the public listing page, so this is
++        // not hypothetical.
++        //
++        // 'unsafe-inline' and 'unsafe-eval' are present because Next's inline
++        // bootstrap and the Google Maps loader both need them; tighten to a
++        // nonce once the inline <Script> blocks in layout.js are nonce-aware.
++        // Everything else is an allowlist of hosts this app genuinely calls.
++        {
++          key: "Content-Security-Policy",
++          value: [
++            "default-src 'self'",
++            "base-uri 'self'",
++            "object-src 'none'",
++            "frame-ancestors 'self'",
++            "form-action 'self'",
++            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.clarity.ms https://maps.googleapis.com https://client.crisp.chat",
++            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://client.crisp.chat",
++            "font-src 'self' data: https://fonts.gstatic.com https://client.crisp.chat",
++            "img-src 'self' data: blob: https://res.cloudinary.com https://*.googleapis.com https://*.gstatic.com https://www.facebook.com https://*.crisp.chat",
++            "connect-src 'self' https://api.cloudinary.com https://maps.googleapis.com https://www.facebook.com https://*.clarity.ms https://*.crisp.chat wss://*.crisp.chat " + (process.env.NEXT_PUBLIC_BASE_URL || ""),
++            "frame-src https://js.stripe.com https://hooks.stripe.com",
++            "upgrade-insecure-requests",
++          ].join("; "),
+         }
+       ],
+     },

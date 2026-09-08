@@ -1,0 +1,97 @@
+diff --git a/.migration-backup/backend/Controllers/ReservationController.js b/.migration-backup/backend/Controllers/ReservationController.js
+index 018d1f6..5507be9 100644
+--- a/.migration-backup/backend/Controllers/ReservationController.js
++++ b/.migration-backup/backend/Controllers/ReservationController.js
+@@ -15,7 +15,7 @@ import {
+ import { sendEvent } from "../utils/FacebookCAPI.js";
+ import { getTiersSnapshot, getPolicyNameSnapshot } from "../utils/cancellationPolicy.js";
+ import { calculateFees, DEFAULT_CURRENCY, PAYOUT_DELAY_HOURS } from "../config/payments.js";
+-import { quoteStay, priceMismatch } from "../utils/pricing.js";
++import { quoteStay, priceMismatch, nightsBetween } from "../utils/pricing.js";
+ import { calendarDateUtc, businessMidnightUtc } from "../utils/timezone.js";
+ import Host from "../models/Host.js";
+ import { isHostBookingReady } from "../utils/listingGating.js";
+@@ -107,7 +107,7 @@ export const createReservation = async (req, res) => {
+     // the request-to-book email can describe the account THIS listing pays into.
+     // Without it every multi-account host would be told about their default.
+     const listing = await Accommodation.findById(reservation.accommodationId).select(
+-      "name cancellationPolicyType customPolicyTiers pricePerNight pricePerPerson flexiblePrices petFeePerNight payoutStripeAccountId"
++      "name cancellationPolicyType customPolicyTiers pricePerNight pricePerPerson flexiblePrices petFeePerNight payoutStripeAccountId person nightMin nightMax"
+     );
+     if (!listing) {
+       return res.status(404).json({ error: "Accommodation not found" });
+@@ -116,17 +116,67 @@ export const createReservation = async (req, res) => {
+     reservation.cancellationPolicySnapshot = getPolicyNameSnapshot(listing);
+     reservation.cancellationTiersSnapshot = getTiersSnapshot(listing);
+ 
++    // --- Party size ---
++    //
++    // The price was computed from `guests.adults` / `guests.children` in the
++    // body while `numberOfPersons` — the count the booking is actually made for,
++    // and the one the host is shown — came from a different body field that was
++    // never reconciled with it. On a listing priced per person, posting
++    // `numberOfPersons: 8` with `guests: { adults: 1 }` produced a confirmed
++    // eight-person booking charged for one. The client picks the number of
++    // guests; it does not get to pick the number the price is computed from.
++    const requestedAdults = Number(req.body?.guests?.adults ?? req.body?.adults ?? 0);
++    const requestedChildren = Number(req.body?.guests?.children ?? req.body?.children ?? 0);
++    const requestedInfants = Number(req.body?.guests?.infants ?? req.body?.infants ?? 0);
++
++    const declaredParty = requestedAdults + requestedChildren + requestedInfants;
++    // Whichever count is HIGHER is the one the stay is priced and validated on,
++    // so neither field can be used to understate the party.
++    const partySize = Math.max(declaredParty, Number(reservation.numberOfPersons) || 0);
++    if (partySize < 1) {
++      return res.status(400).json({ error: "At least one guest is required" });
++    }
++    reservation.numberOfPersons = partySize;
++
++    // Occupancy. Nothing checked this, so a listing sleeping 4 could be booked
++    // for 12 — and on a per-person listing the guest was charged for 12 while
++    // the host discovered the problem on arrival day.
++    if (listing.person && partySize > listing.person) {
++      return res.status(400).json({
++        error: `This property sleeps ${listing.person}`,
++        code: "over_capacity",
++      });
++    }
++
++    // Minimum / maximum stay. Enforced only in the browser until now, so a
++    // direct POST ignored both.
++    const nights = nightsBetween(reservation.checkInDate, reservation.checkOutDate);
++    if (listing.nightMin && nights < listing.nightMin) {
++      return res.status(400).json({
++        error: `Minimum stay is ${listing.nightMin} night(s)`,
++        code: "below_min_nights",
++      });
++    }
++    if (listing.nightMax && nights > listing.nightMax) {
++      return res.status(400).json({
++        error: `Maximum stay is ${listing.nightMax} night(s)`,
++        code: "above_max_nights",
++      });
++    }
++
+     // --- Authoritative price, computed from the listing ---
++    //
++    // Infants are excluded from the per-person rate (matching the checkout
++    // page), but they still count towards occupancy above.
++    const payingAdults = Math.max(
++      1,
++      partySize - requestedInfants > 0 ? partySize - requestedInfants : partySize
++    );
+     const quote = quoteStay(listing, {
+       checkInDate: reservation.checkInDate,
+       checkOutDate: reservation.checkOutDate,
+-      adults: req.body?.guests?.adults ?? req.body?.adults,
+-      children: req.body?.guests?.children ?? req.body?.children,
+-      // numberOfPersons is the only guest count the schema stores, so fall back
+-      // to it when the request did not break the party down by age.
+-      ...(req.body?.guests || req.body?.adults != null
+-        ? {}
+-        : { adults: reservation.numberOfPersons }),
++      adults: payingAdults,
++      children: 0,
+     });
+ 
+     if (!quote.ok) {

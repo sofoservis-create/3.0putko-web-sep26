@@ -1,0 +1,79 @@
+diff --git a/.migration-backup/backend/Controllers/ReservationController.js b/.migration-backup/backend/Controllers/ReservationController.js
+index 018d1f6..cd3af34 100644
+--- a/.migration-backup/backend/Controllers/ReservationController.js
++++ b/.migration-backup/backend/Controllers/ReservationController.js
+@@ -368,11 +368,20 @@ export const getReservationById = async (req, res) => {
+ export const updateReservationByName = async (req, res) => {
+   try {
+     const { name } = req.params; // Extract reservation name from URL parameters
+-    const updates = req.body; // Reservation updates from the request body
++    // Same allowlist as updateReservation — this route reached the same document
++    // with the same unrestricted body.
++    const updates = Object.fromEntries(
++      Object.entries(req.body || {}).filter(([key]) => RESERVATION_UPDATABLE_FIELDS.has(key))
++    );
++
++    // The path segment was interpolated straight into a regular expression, so
++    // `/name/.*` matched every booking and updated whichever came back first,
++    // and a crafted pattern is a CPU-exhaustion primitive. Escaped and anchored.
++    const nameLiteral = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ 
+-    // Find the reservation by name (case-insensitive search) and update it
++    // Find the reservation by name (case-insensitive exact match) and update it
+     const updatedReservation = await Reservation.findOneAndUpdate(
+-      { name: { $regex: name, $options: 'i' } }, // Case-insensitive search by name
++      { name: { $regex: `^${nameLiteral}$`, $options: 'i' } },
+       { $set: updates }, // Apply updates to the fields
+       { new: true, runValidators: true } // Return the updated document and run validators
+     )
+@@ -409,9 +418,13 @@ export const getReservationByName = async (req, res) => {
+   try {
+     const { name } = req.params;
+ 
+-    // Find reservations where the name matches (case-insensitive search)
++    // Escaped and anchored: unescaped, `/name/.*` returned the whole collection
++    // and a crafted pattern burned CPU on every document.
++    const nameLiteral = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++
++    // Find reservations where the name matches (case-insensitive exact match)
+     const reservations = await Reservation.find({
+-      name: { $regex: name, $options: 'i' } // Case-insensitive search
++      name: { $regex: `^${nameLiteral}$`, $options: 'i' }
+     })
+     .populate('accommodationId') // Populate accommodationId as needed
+     .select('-userId'); // Exclude userId field from results
+@@ -525,9 +538,33 @@ export const deleteReservationsByUserId = async (req, res) => {
+ 
+ 
+ // Update Reservation Controller
++// Fields a caller may set on an existing booking.
++//
++// `findByIdAndUpdate(id, req.body)` applied WHATEVER arrived. Every money field
++// is on this schema, so a request could set `paymentStatus: "paid"` on an unpaid
++// booking, rewrite `hostAmountCents` and `totalPriceCents`, clear `transferId`
++// to make an already-paid-out booking eligible for a second transfer, or set
++// `totalPriceCents: 0` and then approve it as a free stay — which blocks the
++// calendar and mails a confirmation without a cent changing hands.
++//
++// Amounts, payment state, payout state and the policy snapshot are all set by
++// the server from the listing and from Stripe, and are never accepted here.
++const RESERVATION_UPDATABLE_FIELDS = new Set([
++  "name",
++  "username",
++  "phone",
++  "message",
++  "language",
++  "numberOfPersons",
++  "isApproved",
++  "cancellationReason",
++]);
++
+ export const updateReservation = async (req, res) => {
+   const { id } = req.params; // Reservation ID from the URL
+-  const updateData = req.body; // Data to update from the request body
++  const updateData = Object.fromEntries(
++    Object.entries(req.body || {}).filter(([key]) => RESERVATION_UPDATABLE_FIELDS.has(key))
++  );
+   const { language } = req.body; // Extract language if provided
+ 
+   try {

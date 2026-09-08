@@ -1,0 +1,86 @@
+diff --git a/.migration-backup/backend/config/payments.js b/.migration-backup/backend/config/payments.js
+index 47ded88..ea4f96b 100644
+--- a/.migration-backup/backend/config/payments.js
++++ b/.migration-backup/backend/config/payments.js
+@@ -13,22 +13,26 @@ const bool = (value, fallback) => {
+   return String(value).toLowerCase() === "true" || String(value) === "1";
+ };
+ 
+-// Platform fee, calibrated to break even on the Stripe cost after VAT.
++// Platform commission: 6 % of the gross booking amount.
+ //
+-// Derivation: Putko owes 23 % VAT on the fee it charges, so of a fee F it keeps
+-// F / 1.23. For that to cover the Stripe cost S:
+-//     F / 1.23 = S   ->   F = 1.23 x S
+-// Stripe's European card cost is 1.4 % + 0.25 EUR, so:
+-//     F = 1.23 x (1.4 % + 0.25) = 1.722 % + 0.3075 EUR
+-// which is why the defaults below are 1.722 % + 31 cents. On a 100 EUR booking
+-// that is 1.72 + 0.31 = 2.03 EUR, matching the worked example in the spec.
++// The previous defaults were 1.722 % + 31 cents, derived to break even on the
++// Stripe cost after VAT. Two premises of that derivation are wrong against the
++// business rules this platform actually operates under:
+ //
+-// Expressing it as percent + fixed (rather than a flat ~2.03 %) matters: the
+-// Stripe cost itself has a fixed component, so a percent-only fee would
+-// under-recover on small bookings and over-recover on large ones.
+-export const PLATFORM_FEE_PERCENT = num(process.env.PLATFORM_FEE_PERCENT, 1.722);
++//   * the commission is 6 %, not a cost-recovery figure;
++//   * Putko is NOT registered for VAT, so the 1.23x uplift that produced
++//     1.722 % has nothing to uplift for.
++//
++// On a 100 EUR booking the platform now retains 6.00 EUR and the host receives
++// 94.00 EUR, against 2.03 / 97.97 before — 3.97 EUR per booking that was being
++// given away on every stay.
++//
++// The fixed component goes to zero: a flat percentage is what "6 % commission"
++// means, and a per-booking surcharge on top of it is a different deal from the
++// one hosts agreed to.
++export const PLATFORM_FEE_PERCENT = num(process.env.PLATFORM_FEE_PERCENT, 6);
+ export const PLATFORM_FEE_FIXED_CENTS = Math.round(
+-  num(process.env.PLATFORM_FEE_FIXED_CENTS, 31)
++  num(process.env.PLATFORM_FEE_FIXED_CENTS, 0)
+ );
+ 
+ // Stripe's own processing cost. Informational only — the real figure comes from
+@@ -39,7 +43,15 @@ export const STRIPE_COST_FIXED_CENTS = Math.round(
+   num(process.env.STRIPE_COST_FIXED_CENTS, 25)
+ );
+ 
+-export const VAT_RATE_PERCENT = num(process.env.VAT_RATE_PERCENT, 23);
++// Putko s. r. o. (IČO 57 329 206) is not a VAT payer, so its commission invoice
++// carries no tax line. Stating VAT on an invoice when you are not registered
++// makes you liable to remit it anyway under § 69 ods. 5 zákona č. 222/2004 Z. z.
++// o dani z pridanej hodnoty — the invoice creates the debt whether or not the
++// money was ever collected.
++//
++// Kept as a knob rather than removed: registration becomes mandatory on crossing
++// the turnover threshold, and on that day this is the single value to change.
++export const VAT_RATE_PERCENT = num(process.env.VAT_RATE_PERCENT, 0);
+ 
+ // Hours after check-in before the host payout may be released.
+ export const PAYOUT_DELAY_HOURS = num(process.env.PAYOUT_DELAY_HOURS, 24);
+@@ -49,18 +61,13 @@ export const PAYOUT_DELAY_HOURS = num(process.env.PAYOUT_DELAY_HOURS, 24);
+ //   false -> hostPayout = total - platformFee               (the model in use)
+ //   true  -> hostPayout = total - platformFee - stripeFee
+ //
+-// This is now FALSE, matching the flow diagram: on a 100 EUR booking the host
+-// receives 97.97 and Putko's fee line is 2.03.
+-//
+-// Charging both would double-count. The 2.03 fee exists precisely to cover the
+-// 1.65 Stripe cost after VAT, so deducting the 1.65 from the host as well would
+-// leave Putko with a 1.65 margin on a model that is explicitly meant to run at
+-// zero. The arithmetic, per 100 EUR booking:
++// FALSE: the 6 % commission is the only deduction from the host's share. The
++// Stripe processing cost comes out of that commission, which is what a
++// marketplace commission is for. Per 100 EUR booking:
+ //     Stripe balance after processing   98.35   (100.00 - 1.65)
+-//     transferred to host              -97.97
+-//     Putko retains                      0.38
+-//     VAT owed on the 2.03 fee          -0.38   (2.03 x 23/123)
+-//     Putko net                          0.00   <- break-even, as intended
++//     transferred to host              -94.00
++//     Putko retains                      4.35   <- commission net of Stripe
++// No VAT line: Putko is not a VAT payer (see VAT_RATE_PERCENT above).
+ export const HOST_PAYS_STRIPE_FEE = bool(process.env.HOST_PAYS_STRIPE_FEE, false);
+ 
+ export const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "eur").toLowerCase();
