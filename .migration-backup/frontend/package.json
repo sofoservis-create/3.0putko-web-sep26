@@ -40,6 +40,20 @@
     "sharp": "^0.33.5",
     "swiper": "^11.1.14"
   },
+  "//browserslist": [
+    "Next 14 ships a 110 kB (38.5 kB gzip) legacy polyfill bundle to EVERY visitor",
+    "unless a browserslist is declared. Measured on this build, that is 12% of the",
+    "329 kB gzip first-load JS on /login and it is dead weight for every browser",
+    "this site actually supports."
+  ],
+  "browserslist": [
+    "chrome >= 91",
+    "edge >= 91",
+    "firefox >= 90",
+    "safari >= 15",
+    "not dead",
+    "not op_mini all"
+  ],
   "devDependencies": {
     "@types/node": "22.5.1",
     "@types/react": "18.3.4",

@@ -51,6 +51,13 @@ import { startInvoiceJob } from "./utils/invoiceJob.js";
 import { sweepExpiredHolds } from "./utils/calendarHold.js";
 import invoiceRoutes from "./Routes/invoiceRoutes.js";
 import icoRoutes from "./Routes/icoRoutes.js";
+import {
+  loginLimiter,
+  accountLimiter,
+  bookingLimiter,
+  messageLimiter,
+  aiLimiter,
+} from "./utils/rateLimit.js";
 
 dotenv.config();
 
@@ -70,8 +77,29 @@ app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 app.use(compression());
 
 // CORS Options
+//
+// `origin` was commented out, which makes the cors package send
+// `Access-Control-Allow-Origin: *`. Combined with the unauthenticated read
+// routes on this API, that let any website on the internet fetch Putko data
+// from its visitors' browsers and read the response.
+//
+// An allowlist, from the environment so staging and production differ without a
+// code change.
+const allowedOrigins = (
+  process.env.CORS_ALLOWED_ORIGINS ||
+  "https://www.putko.sk,https://putko.sk"
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  // origin: "https://putko-main.vercel.app", // Frontend origin
+  origin(origin, callback) {
+    // Same-origin and server-to-server requests send no Origin header.
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} is not allowed`));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -160,6 +188,24 @@ app.get('/', (req, res) => {
 
 app.set('trust proxy', true);
 
+// Rate limits, mounted before the routers they protect.
+//
+// Nothing on this API was rate limited. Ten thousand login attempts a minute
+// against /api/auth/login cost an attacker nothing; /api/auth/password-reset-request
+// sent a real email on every call; /api/chat spent OpenAI credit per request;
+// and /api/reservation wrote a booking and mailed a host each time. Each of
+// these is a distinct budget, so each gets its own bucket.
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/change-password', loginLimiter);
+app.use('/api/admin/login', loginLimiter);
+app.use('/api/auth/register', accountLimiter);
+app.use('/api/auth/password-reset-request', accountLimiter);
+app.use('/api/auth/reset-password', accountLimiter);
+app.use('/api/reservation', bookingLimiter);
+app.use('/api/addmsg', messageLimiter);
+app.use('/api/send', messageLimiter);
+app.use('/api/chat', aiLimiter);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -201,11 +247,19 @@ io.on('connection', (socket) => {
       // Save the message to the database
       // await newMessage.save();
 
-      // Emit the message to all clients
-      io.emit('receive_message', newMessage);
+      // `io.emit` broadcasts to EVERY connected socket, so every private
+      // guest-to-host message was delivered to every other person with the site
+      // open. Delivered to the conversation's participants only.
+      //
+      // The socket is not authenticated at all — nothing here proves `msg.sender`
+      // is who the connection belongs to — so this is a containment fix, not a
+      // complete one. Authenticate the connection (verify the bearer token in
+      // io.use) before treating this channel as private.
+      for (const participant of Array.isArray(msg.users) ? msg.users : []) {
+        io.to(`user:${participant}`).emit('receive_message', newMessage);
+      }
 
-      // Log the sender and receiver IDs for notification
-      console.log(`Notification: User ID: ${msg.sender}, Host ID: ${msg.reciver}`);
+      console.log('Notification: message relayed to conversation participants');
 
       // Emit a notification event
       io.to(socket.id).emit('notification', {
@@ -219,6 +273,12 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Clients join their own room so a message can be addressed rather than
+  // broadcast. See the note above about authenticating this.
+  socket.on('join', (userId) => {
+    if (userId) socket.join(`user:${String(userId)}`);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
@@ -228,6 +288,11 @@ io.on('connection', (socket) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  // A rejected origin is a client mistake, not a server fault, and answering
+  // 500 to it hides the real cause from whoever is debugging the integration.
+  if (/is not allowed$/.test(err?.message || "")) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
   res.status(500).send('Something broke!');
 });
 

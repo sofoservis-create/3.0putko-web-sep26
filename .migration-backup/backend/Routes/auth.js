@@ -1,5 +1,6 @@
 import express from 'express';
 import passport from '../Controllers/passport.js';
+import { requireAuth } from '../auth/authorize.js';
 import { register, login, requestPasswordReset, resetPassword, verifyEmail, changePassword } from '../Controllers/authController.js';
 
 const router = express.Router();
@@ -10,7 +11,7 @@ router.post('/login', login);
 router.post('/password-reset-request', requestPasswordReset); // New route
 router.post('/reset-password', resetPassword); // New route
 router.get('/verify-email/:role/:token', verifyEmail);
-router.post("/change-password", changePassword);
+router.post("/change-password", requireAuth, changePassword);
 
 // Google OAuth routes
 router.get('/google', passport.authenticate('google', {

@@ -21,6 +21,12 @@ import {
 export async function processPayouts() {
   // Coarse DB filter; payoutReservation re-checks the window precisely in the
   // business timezone, so a DST shift cannot let a payout out early.
+  //
+  // Filtered on CHECK-IN even though the precise rule may anchor on check-out,
+  // because check-in is always the earlier of the two — a booking that fails
+  // this filter cannot be eligible under either anchor. Anchoring the coarse
+  // filter on check-out instead would hide every established host's early payout
+  // from the sweep until the stay ended.
   const cutoff = subHours(new Date(), PAYOUT_DELAY_HOURS);
 
   const eligible = await Reservation.find({
@@ -29,7 +35,9 @@ export async function processPayouts() {
     transferId: { $in: [null, undefined] },
     isApproved: { $ne: "cancelled" },
     checkInDate: { $lte: cutoff },
-  }).limit(500);
+  })
+    .sort({ checkInDate: 1 })
+    .limit(500);
 
   const summary = { considered: eligible.length, released: 0, skipped: 0, failed: 0 };
 

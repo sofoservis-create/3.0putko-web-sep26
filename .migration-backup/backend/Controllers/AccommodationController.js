@@ -26,6 +26,7 @@ import {
   pendingRequirementsOf,
 } from "../utils/listingStatus.js";
 import { listPayoutAccounts, resolvePayoutAccount } from "../utils/payoutAccounts.js";
+import { fetchIcal, assertFetchableIcalUrl } from "../utils/safeFetchIcal.js";
 
 export const clearAccommodationCache = async () => {
   try {
@@ -36,10 +37,43 @@ export const clearAccommodationCache = async () => {
   }
 };
 
+// Fields the client must never set on a listing. Every one of them is derived
+// from Stripe or from the platform's own state, and accepting them from the body
+// let a caller hand themselves a PUBLISHED, bookable listing pointed at whatever
+// connected account they named — or move somebody else's listing onto their own
+// host id by posting a different `userId`.
+const LISTING_SERVER_OWNED_FIELDS = [
+  "listingStatus",
+  "listingStatusUpdatedAt",
+  "stripeAccountId",
+  "stripeStatus",
+  "stripeRequirements",
+  "stripeEnabled",
+  "payoutStripeAccountId", // has its own owner-checked route
+  "isApproved",
+  "averageRating",
+  "reviews",
+  "Reservation",
+  "occupancyCalendar",     // has its own routes, with conflict checking
+  "views",
+  "clicks",
+  "customerInterest",
+  "icalExportUrl",
+  "icalExportToken",
+];
+
+const stripServerOwnedListingFields = (data) => {
+  for (const field of LISTING_SERVER_OWNED_FIELDS) delete data[field];
+  return data;
+};
+
 // Create a new accommodation
 export const createAccommodation = async (req, res) => {
   try {
-    const accommodationData = req.body;
+    const accommodationData = stripServerOwnedListingFields({ ...req.body });
+
+    // The owner is the authenticated caller, not whatever the body claims.
+    accommodationData.userId = req.auth?.id || accommodationData.userId;
 
     // Generate a URL-friendly slug from the name (which is the title).
     // slugify transliterates accents (á → a, č → c, ľ → l) rather than
@@ -364,7 +398,12 @@ export const updateAccommodationByAccommodationId = async (req, res) => {
 // Update an accommodation by ID
 export const updateAccommodation = async (req, res) => {
   try {
-    const updatedAccommodationData = { ...req.body };
+    const updatedAccommodationData = stripServerOwnedListingFields({ ...req.body });
+
+    // Ownership is not transferable through an update. Without this a caller
+    // could post someone else's host id and hand the listing — and its bookings
+    // — to another account.
+    delete updatedAccommodationData.userId;
 
     // The slug is permanent. It is generated once on create and forms the public
     // listing URL (/listings/<slug>), so regenerating it on update would break
@@ -660,10 +699,22 @@ export const deleteOccupancyEntry = async (req, res) => {
       return res.status(404).json({ message: "Accommodation not found." });
     }
 
-    // Remove the specific occupancyCalendar entry by entryId
-    accommodation.occupancyCalendar = accommodation.occupancyCalendar
-      .filter((entry) => entry._id.toString() !== entryId)
-      .filter((entry) => ['booked', 'blocked', 'available'].includes(entry.status));
+    // Remove the specific occupancyCalendar entry by entryId.
+    //
+    // The second filter used to drop every row whose status was not booked /
+    // blocked / available — which is to say every 'held' row. Deleting ONE
+    // manual block therefore silently destroyed every live checkout hold on the
+    // listing, and the guests holding them were paying at Stripe: their dates
+    // went back on sale mid-payment, and confirmHold refused their booking after
+    // the money was taken. Only the named entry is removed.
+    const before = accommodation.occupancyCalendar.length;
+    accommodation.occupancyCalendar = accommodation.occupancyCalendar.filter(
+      (entry) => entry._id.toString() !== entryId
+    );
+
+    if (accommodation.occupancyCalendar.length === before) {
+      return res.status(404).json({ message: "Occupancy entry not found." });
+    }
 
 
     // Save the updated accommodation document
@@ -760,14 +811,16 @@ export const setListingPayoutAccount = async (req, res) => {
  * Returns null when the URL is unusable, so a blank row a host left behind in
  * the form never becomes a feed the cron then tries to fetch every three hours.
  */
-const normalizeCalendarFeed = (feed) => {
+const normalizeCalendarFeed = async (feed) => {
   const rawUrl = typeof feed?.url === "string" ? feed.url.trim() : "";
   if (!rawUrl) return null;
 
   const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
   try {
-    // Throws on anything that is not a real link, which is the point.
-    new URL(withProtocol);
+    // Rejects anything that is not a public https URL. Merely parsing it, which
+    // is all this used to do, happily accepted http://127.0.0.1:6379/ and
+    // http://169.254.169.254/ — and the cron then fetched it every three hours.
+    await assertFetchableIcalUrl(withProtocol);
   } catch {
     return null;
   }
@@ -801,7 +854,7 @@ export const saveCalendarSync = async (req, res) => {
       return res.status(404).json({ message: "Accommodation not found" });
     }
 
-    const normalized = incoming.map(normalizeCalendarFeed).filter(Boolean);
+    const normalized = (await Promise.all(incoming.map(normalizeCalendarFeed))).filter(Boolean);
 
     // Same link twice would import every night twice over.
     const seen = new Set();
@@ -1043,11 +1096,23 @@ export const searchAccommodationsByCategory = async (req, res) => {
       sortOption,
     } = req.query;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // `limit` went straight into the query. `?limit=100000` returned the whole
+    // catalogue in one response — a scraping and memory-exhaustion primitive.
+    const pageSize = Math.min(Math.max(parseInt(limit) || 6, 1), 48);
+    const pageNumber = Math.max(parseInt(page) || 1, 1);
+    const skip = (pageNumber - 1) * pageSize;
 
     let filters = {};
 
-    let sortQuery = { recommended: -1 };
+    // Default ranking. Availability is applied as a FILTER below when dates are
+    // supplied, so among the remaining candidates the order is price ascending,
+    // with `recommended` first as a tiebreak.
+    //
+    // NOTE: distance is not in this ordering because there is no distance to
+    // sort by — the listing model stores a bare lat/lng with no geospatial
+    // index, and nothing in this codebase computes a distance. See
+    // audit/REPORT.md; ranking by proximity needs a 2dsphere index first.
+    let sortQuery = { recommended: -1, pricePerNight: 1 };
     if (sortOption === "lowToHigh") {
       sortQuery = { pricePerNight: 1 };
     } else if (sortOption === "highToLow") {
@@ -1085,10 +1150,14 @@ export const searchAccommodationsByCategory = async (req, res) => {
 
     // Accommodation Name (case-insensitive search) - support both `name` and legacy `accommodationName`
     if (name) {
+      // Escaped: the raw query string was compiled as a regular expression, so
+      // `?name=(a%2B)%2B%24` is catastrophic backtracking evaluated against every
+      // document in the collection.
+      const nameLiteral = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filters.$or = [
-        { name: { $regex: name, $options: "i" } },
-        { 'name.en': { $regex: name, $options: "i" } }, // Adjust based on actual schema
-        { accommodationName: { $regex: name, $options: "i" } },
+        { name: { $regex: nameLiteral, $options: "i" } },
+        { 'name.en': { $regex: nameLiteral, $options: "i" } }, // Adjust based on actual schema
+        { accommodationName: { $regex: nameLiteral, $options: "i" } },
       ];
     }
 
@@ -1157,8 +1226,15 @@ export const searchAccommodationsByCategory = async (req, res) => {
                 ]
               },
               {
+                // "blocked" was missing, so a host's own manual block did not
+                // remove the listing from results. The guest saw it as
+                // available, picked those dates, and was refused at checkout
+                // with "Those dates have just been taken" — because
+                // utils/calendarHold.js DOES count blocked rows. The search
+                // index and the booking gate must agree on what "taken" means.
                 $or: [
                   { status: "booked" },
+                  { status: "blocked" },
                   { status: "held", holdExpiresAt: { $gt: new Date() } }
                 ]
               }
@@ -1170,9 +1246,13 @@ export const searchAccommodationsByCategory = async (req, res) => {
 
     // Execute query with projection, pagination and sorting
     if (mapOnly === 'true' || mapOnly === true) {
+      // Capped. This returned EVERY matching listing with no limit, on every
+      // search, alongside the paginated query — the single largest response the
+      // API produces and the one a mobile client pays for twice.
       const allMarkers = await Accommodation.find(filters)
         .select('_id name slug images averageRating reviews location description pricePerNight')
         .sort({ recommended: -1 })
+        .limit(Number(process.env.SEARCH_MAP_MARKER_LIMIT || 500))
         .lean();
 
       return res.status(200).json({
@@ -1186,14 +1266,14 @@ export const searchAccommodationsByCategory = async (req, res) => {
       .select('_id name slug images locationDetails pricePerNight averageRating reviews recommended location description')
       .sort(sortQuery)
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(pageSize)
       .lean();
 
     res.status(200).json({
       accommodations,
       totalCount,
-      totalPages: Math.ceil(totalCount / parseInt(limit)),
-      currentPage: parseInt(page)
+      totalPages: Math.ceil(totalCount / pageSize),
+      currentPage: pageNumber
     });
   } catch (error) {
     console.error('Error fetching accommodations:', error);
@@ -1253,9 +1333,20 @@ export const deleteAccommodationImages = async (req, res) => {
 
 export const generateICS = async (req, res) => {
   const { id } = req.params;
+  const token = req.query.token || req.params.token;
 
   try {
-    const accommodation = await Accommodation.findById(id);
+    // Keyed on the secret, not on the listing id. The id is public and
+    // enumerable, so the old route handed anyone the occupancy of any property.
+    const accommodation = token
+      ? await Accommodation.findOne({ _id: id, icalExportToken: String(token) }).select(
+          "+icalExportToken"
+        )
+      : null;
+
+    if (!token) {
+      return res.status(401).json({ error: "A calendar token is required" });
+    }
 
     // Always respond in ICS format, even if empty
     if (!accommodation) {
@@ -1274,8 +1365,14 @@ END:VCALENDAR`);
       return {
         start: [startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate()],
         end: [endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate()],
-        title: `Reserved - ${entry.guestName || "Guest"}`,
+        // No guest identity in an outbound feed. The consumers of this file are
+        // Airbnb, Booking.com and the like; they need the DATES blocked, and
+        // nothing else. Publishing "Reserved - Jana Nováková" to a third-party
+        // channel is a disclosure of personal data with no basis for it, and it
+        // is what the old title did.
+        title: "Reserved",
         description: `Status: ${entry.status || "Unknown"}`,
+        uid: `${entry._id}@putko.sk`,
       };
     });
 
@@ -1424,12 +1521,36 @@ export const syncBookings = async () => {
 
       for (const feed of feeds) {
         try {
-          const response = await axios.get(feed.url);
-          const parsedData = ical.parseICS(response.data);
+          // Guarded fetch: https only, no private/loopback/link-local
+          // destinations, redirects re-validated per hop, hard timeout and size
+          // cap. `axios.get(feed.url)` had none of these — the URL comes from a
+          // host-editable form, so it was a server-side request forgery
+          // primitive against the platform's own network, and a slow feed with
+          // no timeout stalled the whole sync loop for every other listing.
+          const icsBody = await fetchIcal(feed.url);
+          const parsedData = ical.parseICS(icsBody);
 
           const events = Object.values(parsedData).filter(event => event.type === "VEVENT");
 
           let addedCount = 0;
+          // Every UID this feed still carries. Anything previously imported from
+          // this feed and NOT in here has been deleted or moved upstream, and
+          // must give its dates back — see the reconciliation below.
+          const seenUids = new Set();
+
+          // RRULE is not expanded. `ical@0.8` exposes `event.rrule` but does not
+          // materialise the occurrences, so only the FIRST instance of a
+          // recurring block is imported and every later one is silently dropped
+          // — dates the channel considers blocked stay bookable here, which is a
+          // direct route to a double booking. Flagged loudly rather than
+          // pretended away; expanding them needs a recurrence library.
+          const recurring = events.filter((event) => event.rrule);
+          if (recurring.length) {
+            console.error(
+              `⚠️  ${name || _id} / ${feed.label} — ${recurring.length} recurring event(s) ` +
+                `imported as a single occurrence. Later occurrences are NOT blocked.`
+            );
+          }
 
           for (const event of events) {
             const normalizeDate = (date) => {
@@ -1449,8 +1570,20 @@ export const syncBookings = async () => {
 
             const guestName = (event.summary || "ICS Guest").trim();
             const status = "booked";
+            // RFC 5545 §3.8.4.7: UID is the stable identity of an event across
+            // updates. Matching on (start, end, summary, status) instead meant an
+            // event whose DATES changed upstream was imported as a NEW row while
+            // the old row stayed forever — the nights it used to cover were then
+            // blocked permanently, on a listing nobody was booking. And a channel
+            // that varies its summary text ("Reserved" vs "CLOSED - Not
+            // available") produced a duplicate on every single sync.
+            const uid = event.uid ? String(event.uid) : null;
+            if (uid) seenUids.add(uid);
 
             const exists = occupancyCalendar.some(entry => {
+              // Prefer identity when both sides have one.
+              if (uid && entry.icsUid) return String(entry.icsUid) === uid;
+
               const entryStart = normalizeDate(entry.startDate);
               const entryEnd = normalizeDate(entry.endDate);
 
@@ -1492,13 +1625,58 @@ export const syncBookings = async () => {
                 guestName,
                 status,
                 source: 'ics',
+                icsUid: uid || undefined,
                 calendarSyncId: feed.feedId || undefined,
               });
 
               updated = true;
               addedCount++;
+            } else if (uid) {
+              // Known event: move it if the dates changed upstream, rather than
+              // leaving the old range blocked and adding a second row.
+              const existing = occupancyCalendar.find(
+                (entry) => String(entry.icsUid || "") === uid
+              );
+              if (existing && normalizeDate(existing.startDate) !== newStart) {
+                existing.startDate = new Date(`${newStart}T00:00:00Z`);
+                existing.endDate = new Date(`${newEnd}T00:00:00Z`);
+                updated = true;
+              } else if (existing && normalizeDate(existing.endDate) !== newEnd) {
+                existing.endDate = new Date(`${newEnd}T00:00:00Z`);
+                updated = true;
+              }
             } else {
               console.log('✅ Duplicate booking found. Skipping.');
+            }
+          }
+
+          // DELETION RECONCILIATION.
+          //
+          // The importer only ever ADDED. When a guest cancelled on Airbnb the
+          // event disappeared from the feed, and the block here stayed — for
+          // good. Nights the host could sell were silently dead, with nothing in
+          // the UI to say why, and the loss compounded with every cancellation.
+          //
+          // Only rows this feed created and that carry a UID are considered:
+          // rows imported before UIDs were recorded cannot be matched against
+          // the feed, so removing them would be a guess, and a wrong guess here
+          // frees dates that are genuinely booked.
+          if (feed.feedId) {
+            const before = occupancyCalendar.length;
+            for (let i = occupancyCalendar.length - 1; i >= 0; i--) {
+              const entry = occupancyCalendar[i];
+              if (entry.source !== 'ics') continue;
+              if (String(entry.calendarSyncId || '') !== String(feed.feedId)) continue;
+              if (!entry.icsUid) continue;
+              if (seenUids.has(String(entry.icsUid))) continue;
+              occupancyCalendar.splice(i, 1);
+            }
+            const removed = before - occupancyCalendar.length;
+            if (removed) {
+              updated = true;
+              console.log(
+                `➖ ${name || _id} / ${feed.label} — released ${removed} block(s) no longer in the feed.`
+              );
             }
           }
 

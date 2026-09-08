@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Script from "next/script";
+import { useConsent } from "./CookieConsent";
 
 const TrackPageView = () => {
   const pathname = usePathname();
@@ -18,10 +19,18 @@ const TrackPageView = () => {
 };
 
 const MetaPixel = () => {
+  const consent = useConsent();
+
   useEffect(() => {
     if (window.__META_PIXEL_LOADED__) return;
     window.__META_PIXEL_LOADED__ = true;
   }, []);
+
+  // Nothing is rendered — and therefore fbevents.js is never fetched and no
+  // _fbp cookie is written — until the visitor has opted in. Previously this
+  // component was mounted unconditionally from the root layout, so the pixel
+  // initialised and fired PageView on first paint.
+  if (!consent?.marketing) return null;
 
   return (
     <>

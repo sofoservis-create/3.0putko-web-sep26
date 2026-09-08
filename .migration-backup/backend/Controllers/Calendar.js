@@ -1,5 +1,6 @@
 import axios from 'axios';
 import ical from 'ical';
+import { fetchIcal } from '../utils/safeFetchIcal.js';
 
 export const fetchICal = async (req, res) => {
     try {
@@ -10,8 +11,15 @@ export const fetchICal = async (req, res) => {
 
         const iCalUrl = `https://www.airbnb.com/calendar/ical/${calendarId}.ics?s=${secretToken}`;
 
-        // Fetch the iCal data
-        const response = await axios.get(iCalUrl);
+        // Fetch the iCal data. Bounded: the URL is built from caller-supplied
+        // path segments, and an unbounded axios call holds a worker open for as
+        // long as the far end cares to stall it.
+        const response = await axios.get(iCalUrl, {
+            timeout: 10000,
+            maxRedirects: 2,
+            maxContentLength: 5 * 1024 * 1024,
+            responseType: 'text',
+        });
         const iCalData = response.data;
 
         // Parse the iCal data
@@ -53,20 +61,20 @@ export const fetchICalByUrl = async (req, res) => {
             return res.status(400).json({ error: "Query param 'url' is required and must be a string." });
         }
 
-        // Basic validation: only allow http/https
-        let parsed;
+        // This endpoint fetches an arbitrary caller-supplied URL from inside the
+        // platform's network and returns the parsed result — a textbook SSRF
+        // read primitive. Checking only the protocol, which is all it used to
+        // do, stops nothing: http://169.254.169.254/ passes that test.
+        //
+        // fetchIcal enforces https, resolves DNS and refuses any private,
+        // loopback or link-local answer, re-validates each redirect hop, and
+        // applies a timeout and a size cap.
+        let iCalData;
         try {
-            parsed = new URL(url);
-        } catch (e) {
-            return res.status(400).json({ error: "Invalid URL format provided." });
+            iCalData = await fetchIcal(url);
+        } catch (err) {
+            return res.status(400).json({ error: err.message });
         }
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            return res.status(400).json({ error: "Only http/https URLs are allowed for fetching iCal data." });
-        }
-
-        // Fetch ICS
-        const response = await axios.get(parsed.toString(), { responseType: 'text' });
-        const iCalData = response.data;
 
         // Parse ICS into unified booking objects
         const events = ical.parseICS(iCalData);

@@ -299,6 +299,47 @@ export function requireReservationAccess({
 }
 
 /**
+ * Loads `req.listing` and asserts the caller owns it, or is an admin.
+ *
+ * Every write route on AccommodationRoutes was open to the internet. With a
+ * listing id — which is on every public listing page — anyone could edit any
+ * listing, delete it, add or remove calendar blocks, or attach an iCal feed the
+ * platform then fetched every three hours. `setListingPayoutAccount` was the one
+ * route on that router that already checked ownership; this generalises the same
+ * rule so the rest of them can too.
+ */
+export function requireListingOwner({ param = "id", source = "params" } = {}) {
+  return [
+    ...requireAuth,
+    async (req, res, next) => {
+      const listingId = req[source]?.[param];
+
+      if (!listingId || !mongoose.Types.ObjectId.isValid(listingId)) {
+        return res.status(400).json({ error: "Valid listing id required" });
+      }
+
+      const listing = await Accommodation.findById(listingId).select("userId");
+      if (!listing) {
+        return res.status(404).json({ error: "Accommodation not found" });
+      }
+
+      const owns =
+        req.auth.kind === "admin" || String(listing.userId || "") === req.auth.id;
+
+      if (!owns) {
+        return res.status(403).json({
+          error: "You may only manage your own listings",
+          code: "not_listing_owner",
+        });
+      }
+
+      req.listing = listing;
+      next();
+    },
+  ];
+}
+
+/**
  * Asserts the caller is the host identified by `param`, or an admin.
  * Used for the Stripe onboarding endpoints, which would otherwise let anyone
  * create or inspect a connected account for any host id they can guess.

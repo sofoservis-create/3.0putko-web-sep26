@@ -462,4 +462,11 @@ const DeletedAccommodationSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: Date.now }  // Stores deletion time
 }, { timestamps: true });
 
+// Retention: three years, matching DeletedReservation. A soft-deleted listing
+// carries its host's identity and its bookings' history; nothing expired it.
+DeletedAccommodationSchema.index(
+  { deletedAt: 1 },
+  { expireAfterSeconds: 60 * 60 * 24 * 365 * 3 }
+);
+
 export default mongoose.model('DeletedAccommodation', DeletedAccommodationSchema);

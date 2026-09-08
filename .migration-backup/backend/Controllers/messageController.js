@@ -6,7 +6,10 @@ import User from "../models/User.js";
 
 // Add a new message
 export const addMessage = async (req, res) => {
-  const { message, users, sender, reciver } = req.body;
+  const { message, users, reciver } = req.body;
+  // The sender is the authenticated caller, never a body field — otherwise
+  // anyone can post a message that appears to come from anyone.
+  const sender = String(req.auth?.id || req.userId || "");
 
   try {
     // Validate that users and sender are valid ObjectIds
@@ -44,6 +47,14 @@ export const getMessages = async (req, res) => {
   const { userId1, userId2 } = req.query; // Get from query parameters
 
   try {
+    // The caller must be one of the two participants. Both ids arrived as query
+    // parameters with nothing tying them to the requester, so any pair could be
+    // read — every conversation on the platform, by iterating ids.
+    const callerId = String(req.auth?.id || req.userId || "");
+    if (callerId !== String(userId1) && callerId !== String(userId2)) {
+      return res.status(403).json({ message: "Not your conversation" });
+    }
+
     // Validate that userId1 and userId2 are valid ObjectIds
     // if (!mongoose.Types.ObjectId.isValid(userId1) && !mongoose.Types.ObjectId.isValid(userId2)) {
     //   return res.status(400).json({ message: "Invalid user IDs" });

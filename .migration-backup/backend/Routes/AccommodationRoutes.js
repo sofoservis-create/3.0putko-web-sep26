@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate, restrict } from '../auth/verifyToken.js';
-import { identify } from '../auth/authorize.js';
+import { identify, requireAdmin, requireAuth, requireListingOwner } from '../auth/authorize.js';
 import {
   createAccommodation,
   getPublishReadiness,
@@ -41,7 +41,7 @@ import {
 const router = express.Router();
 
 // Static routes should be placed before dynamic ones
-router.get("/accommodation/approve-listing", approveListing); // ✅ This must be before :id
+router.get("/accommodation/approve-listing", requireAdmin, approveListing); // ✅ This must be before :id
 router.get("/accommodation/stripe-enabled", getStripeEnabledAccommodations);
 router.get('/accommodation/recommended', getAllRecommendedAccommodations);
 // GET counts for all fixed cities
@@ -55,21 +55,24 @@ router.get("/accommodation/listing-stats", getListingStats);
 // Search accommodations by category (this should be first)
 router.get("/accommodations/searching", searchAccommodationsByCategory);
 router.get("/accommodation/search", searchAccommodationsByCategorys);
+// The token may travel as a path segment (what most channel managers accept in
+// a subscription URL) or as ?token=. Either way it is required — see generateICS.
+router.get("/accommodation/:id/calendar/:token.ics", generateICS);
 router.get("/accommodation/:id/calendar.ics", generateICS);
-router.post("/accommodation", createAccommodation);
+router.post("/accommodation", requireAuth, createAccommodation);
 // Whether a host may publish listings yet, and what is still missing.
 router.get("/accommodation/publish-readiness/:hostId", getPublishReadiness);
-router.get("/accommodation/deleted", getDeletedAccommodations);  // Get deleted accommodations
+router.get("/accommodation/deleted", requireAdmin, getDeletedAccommodations);  // Get deleted accommodations
 router.get("/accommodation", getAccommodations);
-router.put("/accommodation/restore/:id", restoreAccommodation);  // Restore deleted accommodation
+router.put("/accommodation/restore/:id", requireAdmin, restoreAccommodation);  // Restore deleted accommodation
 router.get("/accommodation/:id", getAccommodationById);
-router.put("/accommodation/:id", updateAccommodation);
+router.put("/accommodation/:id", requireListingOwner(), updateAccommodation);
 router.get("/accommodation/slug/:slug", getAccommodationBySlug);
-router.delete("/accommodation/deleted/:id", deletePermanently);
-router.delete("/:accommodationId/occupancy/:entryId", deleteOccupancyEntry);
+router.delete("/accommodation/deleted/:id", requireAdmin, deletePermanently);
+router.delete("/:accommodationId/occupancy/:entryId", requireListingOwner({ param: "accommodationId" }), deleteOccupancyEntry);
 router.get("/accommodation/user/:userId", getUserAccommodations);
-router.put("/accommodation/:id/occupancyCalendar", addToOccupancyCalendar);
-router.put("/accommodation/updateOccupancyCalendar/:userId", updateAccommodationByAccommodationId);
+router.put("/accommodation/:id/occupancyCalendar", requireListingOwner(), addToOccupancyCalendar);
+router.put("/accommodation/updateOccupancyCalendar/:userId", requireAdmin, updateAccommodationByAccommodationId);
 // Must sit before the plain /accommodation/:id delete so the sub-path wins.
 // Which of the host's connected accounts this listing pays out to.
 //
@@ -85,13 +88,13 @@ router.put("/accommodation/:id/payout-account", identify, setListingPayoutAccoun
 
 // Multi-feed calendar sync. The per-feed routes carry an extra path segment, so
 // they cannot be shadowed by the "disconnect everything" route below them.
-router.put("/accommodation/:id/calendar-sync", saveCalendarSync);
-router.put("/accommodation/:id/calendar-sync/:feedId/status", updateCalendarSyncStatus);
-router.delete("/accommodation/:id/calendar-sync/:feedId", removeCalendarSyncFeed);
-router.delete("/accommodation/:id/calendar-sync", removeCalendarSync);
-router.delete("/accommodation/:id", deleteAccommodation);
-router.delete("/accommodation/:id/images", deleteAccommodationImages);
-router.put("/accommodation/fix-coordinates/:id", fixCoordinatesForOne);
+router.put("/accommodation/:id/calendar-sync", requireListingOwner(), saveCalendarSync);
+router.put("/accommodation/:id/calendar-sync/:feedId/status", requireListingOwner(), updateCalendarSyncStatus);
+router.delete("/accommodation/:id/calendar-sync/:feedId", requireListingOwner(), removeCalendarSyncFeed);
+router.delete("/accommodation/:id/calendar-sync", requireListingOwner(), removeCalendarSync);
+router.delete("/accommodation/:id", requireListingOwner(), deleteAccommodation);
+router.delete("/accommodation/:id/images", requireListingOwner(), deleteAccommodationImages);
+router.put("/accommodation/fix-coordinates/:id", requireListingOwner(), fixCoordinatesForOne);
 
 // Routes for incrementing view and click counts
 router.put('/accommodation/:id/view', incrementViewCount);

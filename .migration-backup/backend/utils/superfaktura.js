@@ -84,8 +84,11 @@ export const buildInvoicePayload = ({ host, invoiceDocument, withEmail }) => {
   const yearMonth = yearMonthOf(invoiceDocument);
   const bookingCount = invoiceDocument.billedBookings || 0;
 
-  // The item is priced NET: the 23 % tax line below rebuilds the gross that was
-  // actually deducted from the host.
+  // When Putko is not VAT registered (VAT_RATE_PERCENT === 0) net and gross are
+  // the same figure and the item carries no tax. Pricing the item off
+  // `netAmountCents` while unconditionally attaching a 23 % tax line put VAT on
+  // every commission invoice — a tax a non-registered issuer becomes liable for
+  // simply by writing it on the document (§ 69 ods. 5 zákona o DPH).
   const netAmount = (invoiceDocument.netAmountCents / 100).toFixed(2);
 
   const payload = {
@@ -99,7 +102,9 @@ export const buildInvoicePayload = ({ host, invoiceDocument, withEmail }) => {
       constant: INVOICE_CONSTANT_SYMBOL,
       // Stripe deducted the fee at each booking; this document only records it.
       already_paid: 1,
-      comment: `Putko — sprostredkovateľské poplatky za ${bookingCount} rezervácií v ${yearMonth}`,
+      comment:
+        `Putko — sprostredkovateľské poplatky za ${bookingCount} rezervácií v ${yearMonth}` +
+        (VAT_RATE_PERCENT === 0 ? ". Nie sme platiteľmi DPH." : ""),
     },
     Client: buildClient(host, invoiceDocument),
     InvoiceItem: [
@@ -112,6 +117,11 @@ export const buildInvoicePayload = ({ host, invoiceDocument, withEmail }) => {
         tax: VAT_RATE_PERCENT,
       },
     ],
+    // Required on an invoice from a non-VAT-registered issuer: the document must
+    // say why no tax is shown, or it reads as an incomplete tax invoice.
+    ...(VAT_RATE_PERCENT === 0
+      ? { InvoiceSettingNote: "Nie sme platiteľmi DPH." }
+      : {}),
     InvoiceSetting: {
       language: "slo",
       signature: true,

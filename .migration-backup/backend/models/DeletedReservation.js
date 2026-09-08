@@ -122,6 +122,21 @@ const DeletedReservationSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: Date.now }
 });
 
+// Retention: three years.
+//
+// Nothing expired these records — a deleted booking's guest name, email, phone
+// number and stay history sat here for good. GDPR Art. 5(1)(e) requires personal
+// data to be kept no longer than necessary, and Putko's stated retention for
+// reservation data is three years, which is also the period § 76 zákona
+// č. 222/2004 Z. z. wants for the underlying accounting records.
+//
+// A TTL index makes the database enforce it rather than a cron nobody watches:
+// Mongo's TTL monitor sweeps once a minute against `deletedAt` + the interval.
+DeletedReservationSchema.index(
+  { deletedAt: 1 },
+  { expireAfterSeconds: 60 * 60 * 24 * 365 * 3 }
+);
+
 // Create the Reservation model
 const DeletedReservation = mongoose.model('DeletedReservation', DeletedReservationSchema);
 

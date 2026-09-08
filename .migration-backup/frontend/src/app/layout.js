@@ -15,6 +15,18 @@ const MetaPixel = dynamic(() => import("./components/MetaPixel"), {
   ssr: false,
 });
 
+const CookieConsent = dynamic(() => import("./components/CookieConsent"), {
+  ssr: false,
+});
+
+// Microsoft Clarity records sessions — pointer movement, clicks, scrolls and,
+// unless masked, form contents. It was injected here for every visitor on first
+// paint, before any consent was asked for. Moved behind the same gate as the
+// pixel; see components/ClarityAnalytics.js.
+const ClarityAnalytics = dynamic(() => import("./components/ClarityAnalytics"), {
+  ssr: false,
+});
+
 // Google Fonts setup with all weights
 // Inter supports 100–900
 const inter = Inter({ subsets: ["latin"], weight: ["400","500","600","700","800","900"], display: 'swap', variable: '--font-inter' });
@@ -40,23 +52,12 @@ export default function RootLayout({ children, pageProps }) {
   return (
     <html lang="en">
        <head>
-        <Script
-          id="microsoft-clarity"
-          strategy="lazyOnload"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function(c,l,a,r,i,t,y){
-                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-              })(window, document, "clarity", "script", "rq26savlme");
-            `
-          }}
-        />
         <meta name="facebook-domain-verification" content="jnvl0hzx85r1pzgkaes6eyou6h9tqo" />
       </head>
 
       <body className={`${inter.variable} ${playfair.variable} ${poppins.variable} ${dmSans.variable} ${fraunces.variable}`}>
+         <CookieConsent />
+         <ClarityAnalytics />
          <MetaPixel />
         <AuthContextProvider>
         <FormProvider {...pageProps}>
