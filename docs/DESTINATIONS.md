@@ -1,13 +1,16 @@
 # Obľúbené miesta na Slovensku — the destination catalogue
 
+Reviewed by the owner: Štrbské Pleso added, every other proposed addition
+declined. 35 destinations.
+
 This replaces the home page's flat "Kam sa chystáte?" city grid
 (`audit/DESIGN-AUDIT.md` D-04). It is the browse layer: travel regions and
 mountain areas alongside cities, the way people actually decide where to go —
 nobody books "a kraj", they book Liptov.
 
-**This list needs your review.** The mechanism is verified; the choice of
-which 34 places to list, and how wide each one is, is a product decision
-about the Slovak market. Correct it: edit the array in
+The mechanism is verified; which 35 places to list, and how wide each one is,
+stays a product decision about the Slovak market. Correcting it is cheap and
+needs no migration: edit the array in
 `lib/db/scripts/seed-destinations.mjs` and re-run
 `pnpm run seed:destinations` (idempotent upsert — re-running is safe), then
 `pnpm run verify:destinations`.
@@ -46,7 +49,7 @@ Tatry are children of Tatry, and the home page shows one level at a time.
 
 **Nothing empty is ever shown.** The home grid filters to destinations with
 at least one published listing and ranks by that count. With supply where it
-is today, a grid of 34 tiles would be mostly "0 možností" — worse than the
+is today, a grid of 35 tiles would be mostly "0 možností" — worse than the
 city grid it replaces. The section grows as the supply grows; until then it
 shows only what is true. Editorial `sort_order` only breaks ties between
 destinations that already have listings, so it cannot promote an empty one.
@@ -69,6 +72,7 @@ too large shows a listing in one destination more than a purist would like.
 |---|---|---|---|---|
 | Tatry | — | 49.1500 | 20.0500 | 32 km |
 | Vysoké Tatry | Tatry | 49.1385 | 20.2200 | 15 km |
+| Štrbské Pleso | Vysoké Tatry | 49.1197 | 20.0631 | 9 km |
 | Západné Tatry | Tatry | 49.2000 | 19.7500 | 15 km |
 | Nízke Tatry | — | 48.9400 | 19.6200 | 30 km |
 | Jasná – Demänovská dolina | Nízke Tatry | 48.9694 | 19.5883 | 9 km |
@@ -131,16 +135,27 @@ Trenčín, Košice, Prešov and Banská Bystrica are the four the current home
 page already shows, so nothing visible today disappears when the section is
 replaced.
 
-## What I'd like you to check
+## Reviewed by the owner
 
-1. **Missing destinations.** Where do your hosts actually have property that
-   isn't covered? Gemer, Šariš, Zemplín, Podunajsko, Turiec, Muránska
-   planina, Vihorlat, Poloniny, Štrbské Pleso as its own tile — all
-   deliberate omissions I'd rather you confirm than guess at.
-2. **Radii.** Especially Záhorie (30 km) and Slovenský kras (22 km), which I
+**Štrbské Pleso added** as the one further destination worth having — the only
+individual resort in the catalogue, because it is the one Slovak place people
+search for by name rather than by region. It sits three levels deep
+(Tatry → Vysoké Tatry → Štrbské Pleso) with a 9 km radius, which reaches down
+to Tatranská Štrba and Štrba village — where a good share of what is marketed
+as "Štrbské Pleso" actually sleeps — and stops short of Podbanské.
+
+**Confirmed omissions**, reviewed and deliberately left out: Gemer, Šariš,
+Zemplín, Podunajsko, Turiec, Muránska planina, Vihorlat, Poloniny. Adding one
+later is an edit to the array plus a re-run — no migration, no backfill.
+
+### Still open
+
+1. **Radii.** Especially Záhorie (30 km) and Slovenský kras (22 km), which I
    placed with the least confidence.
-3. **Names.** Spelt the way a Slovak guest would type them into search.
-4. **Descriptions.** One sentence each, currently mine. They will be read.
+2. **Names.** Spelt the way a Slovak guest would type them into search.
+3. **Descriptions.** One sentence each, currently mine. They will be read.
+4. **Coordinates.** Approximate centre points from my own knowledge — fine for
+   8–32 km radii, still worth a pass on a map.
 
 ## Known limitation: circles
 
