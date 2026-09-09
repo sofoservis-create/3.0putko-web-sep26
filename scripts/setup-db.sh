@@ -97,3 +97,8 @@ fi
 
 echo
 echo "Database ready."
+# Say what to do next. Finishing on "Database ready." leaves someone at a
+# prompt with no indication that a second command is needed — which is a
+# small gap that reads as "it did not work".
+echo
+echo "Next:  bash scripts/replit-start.sh     (starts the app)"
