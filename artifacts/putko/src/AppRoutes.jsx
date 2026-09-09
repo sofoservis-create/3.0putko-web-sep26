@@ -4,6 +4,9 @@ import RouteMetadata from './app/components/RouteMetadata';
 import ProtectedRoute from './app/ProtectedRoute';
 import { AuthContext } from './app/context/AuthContext';
 import { useRouter } from './app/components/NextNavigation';
+import { HostNavigationProvider, useHostNavigation } from './app/host/HostNavigationGuard';
+import LeaveEditorDialog from './app/host-preview/components/editor/LeaveEditorDialog';
+import { FormContext } from './app/FormContext';
 
 const Home = lazy(() => import('./app/page.jsx'));
 const About = lazy(() => import('./app/About/page.jsx'));
@@ -87,11 +90,46 @@ function ProtectedHostOnboardSuccessRoute() {
   );
 }
 
+// While the Host editor holds unsaved changes, a URL change it does not own
+// (browser Back to /account, etc.) is held here so the editor stays mounted
+// until the host saves, discards, or stays. See HostNavigationGuard.
+function GuardedSwitch({ children }) {
+  const { shownPath } = useHostNavigation();
+  const [pathname] = shownPath.split('?');
+  return <Switch location={pathname}>{children}</Switch>;
+}
+
+function LeaveGuardDialog() {
+  const nav = useHostNavigation();
+  const { lang } = useContext(FormContext);
+  return (
+    <LeaveEditorDialog
+      open={Boolean(nav.pending)}
+      language={lang || 'sk'}
+      saving={nav.saving}
+      saveInFlight={nav.saveInFlight}
+      saveError={nav.saveError}
+      onStay={nav.cancelLeave}
+      onDiscard={nav.discardAndLeave}
+      onSaveAndLeave={nav.saveAndLeave}
+    />
+  );
+}
+
 export default function AppRoutes() {
+  return (
+    <HostNavigationProvider>
+      <AppRouteTree />
+      <LeaveGuardDialog />
+    </HostNavigationProvider>
+  );
+}
+
+function AppRouteTree() {
   return (
     <Suspense fallback={<Fallback />}>
       <RouteMetadata />
-      <Switch>
+      <GuardedSwitch>
         <Route path="/" component={Home} />
         <Route path="/about" component={About} />
         <Route path="/admin-login" component={AdminLogin} />
@@ -133,7 +171,7 @@ export default function AppRoutes() {
         <Route>
           <div className="flex h-screen items-center justify-center">404 Not Found</div>
         </Route>
-      </Switch>
+      </GuardedSwitch>
     </Suspense>
   );
 }

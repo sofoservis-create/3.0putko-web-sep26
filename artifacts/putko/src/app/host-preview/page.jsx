@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useLocation } from "wouter";
 import { AuthContext } from "../context/AuthContext";
 import { FormContext } from "../FormContext";
 import {
@@ -21,6 +21,7 @@ import {
   START_ONBOARDING_FLAG,
 } from "../host/hostRoutes";
 import { HostListingsProvider, useHostListings } from "../host/HostListingsContext";
+import { useHostNavigation } from "../host/HostNavigationGuard";
 import {
   listingDisplayPercent,
   listingName,
@@ -43,8 +44,17 @@ function HostWorkspaceShell() {
   const { switchMode, user } = useContext(AuthContext);
   const { lang, updatelang } = useContext(FormContext);
   const language = lang || "sk";
-  const [pathname, navigate] = useLocation();
-  const search = useSearch();
+  const [, rawNavigate] = useLocation();
+  // The app-level leave guard (HostNavigationProvider in AppRoutes) owns
+  // unsaved-change confirmation. Every navigation the shell starts goes
+  // through it; replace navigations issued by the editor itself (id swap,
+  // ?review) use rawNavigate. While the editor holds unsaved changes, a URL
+  // change it does not own (browser Back, etc.) is held in `shownPath` so the
+  // editor stays mounted with its edits until the host confirms.
+  const hostNavigation = useHostNavigation();
+  const navigate = hostNavigation.guardedNavigate;
+  const { linkProps, guardedAction } = hostNavigation;
+  const [pathname, search = ""] = hostNavigation.shownPath.split("?");
 
   // The Host shell does not render the public header that normally restores
   // the chosen language, so honour the stored preference on a hard reload.
@@ -66,14 +76,14 @@ function HostWorkspaceShell() {
     if (typeof window === "undefined") return;
     if (localStorage.getItem(START_ONBOARDING_FLAG) === "true") {
       localStorage.removeItem(START_ONBOARDING_FLAG);
-      navigate(hostPaths.newListing, { replace: true });
+      rawNavigate(hostPaths.newListing, { replace: true });
     }
-  }, [navigate]);
+  }, [rawNavigate]);
 
   // Unknown /host/... paths fall back to the Today view.
   useEffect(() => {
-    if (location === null) navigate(hostPaths.today, { replace: true });
-  }, [location, navigate]);
+    if (location === null) rawNavigate(hostPaths.today, { replace: true });
+  }, [location, rawNavigate]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -90,23 +100,28 @@ function HostWorkspaceShell() {
     refreshListings({ background: true });
   }, [section, editorOpen, refreshListings]);
 
-  const handleSwitchToTravel = async () => {
-    setSwitching(true);
-    try {
-      await switchMode("guest");
-      toast.success(
-        language === "en" ? "Switched to Travel Mode." : "Prepnuté do režimu cestovateľa.",
-      );
-      window.location.href = "/account";
-    } catch (error) {
-      toast.error(error.message || "Failed to switch mode.");
-      setSwitching(false);
-    }
-  };
+  // Mode switching removes the editor (ProtectedRoute re-evaluates the role),
+  // so the unsaved-changes confirmation must come before the mode mutation.
+  const handleSwitchToTravel = () =>
+    guardedAction(async () => {
+      setSwitching(true);
+      try {
+        await switchMode("guest");
+        toast.success(
+          language === "en" ? "Switched to Travel Mode." : "Prepnuté do režimu cestovateľa.",
+        );
+        window.location.href = "/account";
+      } catch (error) {
+        toast.error(error.message || "Failed to switch mode.");
+        setSwitching(false);
+        throw error;
+      }
+    });
 
-  const handleBackToWeb = () => {
-    window.location.href = "/";
-  };
+  const handleBackToWeb = () =>
+    guardedAction(() => {
+      window.location.href = "/";
+    });
 
   const openListing = (id, { review = false } = {}) => navigate(hostPaths.listing(id, { review }));
   const openNewListing = () => navigate(hostPaths.newListing);
@@ -272,9 +287,9 @@ function HostWorkspaceShell() {
             accommodationId={location?.listingId ?? null}
             openReview={Boolean(location?.review)}
             onBack={backToListings}
-            onCreated={(id) => navigate(hostPaths.listing(id), { replace: true })}
+            onCreated={(id) => rawNavigate(hostPaths.listing(id), { replace: true })}
             onReviewDismiss={() => {
-              if (location?.listingId) navigate(hostPaths.listing(location.listingId), { replace: true });
+              if (location?.listingId) rawNavigate(hostPaths.listing(location.listingId), { replace: true });
             }}
           />
         );
@@ -298,7 +313,7 @@ function HostWorkspaceShell() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex fixed top-0 left-0 w-[280px] h-screen bg-[#1E3E2B] text-white flex-col shadow-2xl z-40">
         <div className="p-5 border-b border-white/10 shrink-0">
-          <Link href="/" className="block mb-6">
+          <Link {...linkProps("/")} className="block mb-6">
             <img src="/putko.png" alt="Putko" className="h-8 brightness-0 invert" />
           </Link>
           <div className="flex items-center gap-4">
@@ -320,7 +335,7 @@ function HostWorkspaceShell() {
                 const active = isActive(tab.id) || (tab.id === "listings" && editorOpen);
                 return (
                   <li key={tab.id}>
-                    <Link href={tab.href} aria-current={active ? "page" : undefined} className={navButtonClass(active)}>
+                    <Link {...linkProps(tab.href)} aria-current={active ? "page" : undefined} className={navButtonClass(active)}>
                       <tab.icon size={20} className={active ? "text-[#1E3E2B]" : "text-[#DFBA73]"} strokeWidth={active ? 2.5 : 2} />
                       <span className="text-[15px]">{tab.label[language]}</span>
                     </Link>
@@ -363,7 +378,7 @@ function HostWorkspaceShell() {
             <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-3">{language === "en" ? "Help" : "Pomoc"}</div>
             <ul className="space-y-1">
               <li>
-                <Link href={HOST_GUIDE_PATH} className={navButtonClass(false)}>
+                <Link {...linkProps(HOST_GUIDE_PATH)} className={navButtonClass(false)}>
                   <BookOpenText size={20} className="text-[#DFBA73]" />
                   <span className="text-[15px]">{language === "en" ? "Host Guide" : "Príručka"}</span>
                 </Link>
@@ -414,7 +429,7 @@ function HostWorkspaceShell() {
                 return (
                   <Link
                     key={tab.id}
-                    href={tab.href}
+                    {...linkProps(tab.href)}
                     aria-current={active ? "page" : undefined}
                     className={`flex min-h-11 flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${active ? "text-[#1E3E2B]" : "text-neutral-400 hover:text-neutral-800"}`}
                   >
@@ -428,6 +443,7 @@ function HostWorkspaceShell() {
         )}
 
       </div>
+
     </div>
   );
 }
