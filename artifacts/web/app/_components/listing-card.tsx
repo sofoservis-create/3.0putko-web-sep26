@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eur, guestsWord, nightsWord } from "../_lib/format";
 
 export type ListingRow = {
@@ -14,7 +15,10 @@ export function ListingCard({ listing }: { listing: ListingRow }) {
   const { name, city, basePriceCents, maxGuests, distanceM } = listing;
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card">
+    <Link
+      href={`/ubytovanie/${listing.slug}`}
+      className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card transition-transform duration-200 hover:-translate-y-0.5"
+    >
       {/* No photography exists for these yet. An empty tinted band is
           honest; a stock photo of somebody else's chalet is not. */}
       <div className="h-36 bg-gradient-to-br from-photo-from to-photo-to" />
@@ -38,6 +42,6 @@ export function ListingCard({ listing }: { listing: ListingRow }) {
           / {nightsWord(1)} · až {maxGuests} {guestsWord(maxGuests)}
         </p>
       </div>
-    </article>
+    </Link>
   );
 }

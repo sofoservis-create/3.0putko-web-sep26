@@ -13,7 +13,10 @@
     "@workspace/db": "workspace:*",
     "next": "^15.5.4",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "drizzle-orm": "catalog:",
+    "@workspace/auth": "workspace:*",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.14",

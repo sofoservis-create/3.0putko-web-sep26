@@ -77,6 +77,7 @@ pnpm run verify:no-double-booking # the overlap-constraint proof (see below)
 pnpm run seed:destinations        # the "Obľúbené miesta" catalogue (idempotent)
 pnpm run verify:destinations      # tile counts == page results (see below)
 pnpm run seed:demo-listings       # 17 fictional listings, dev only
+pnpm exec tsx scripts/seed-demo-accounts.ts   # demo login, dev only
 pnpm exec tsx scripts/smoke-destination-queries.ts   # the exported query fns
 ```
 
@@ -180,6 +181,33 @@ carries an allowlist of every legitimate circle-overlaps-circle pair, so a
 radius change that quietly starts pulling Liptov listings into Orava fails
 the script instead of shipping.
 
+### Accounts — identity comes from the server, never the client
+
+`/ucet` (guest) and `/host` share one shell, one identity model and one set
+of queries. `app/_lib/session.ts` resolves the caller from an **httpOnly**
+session cookie joined to a session row; a page never handles a user id it
+could substitute. The old system reads
+`JSON.parse(localStorage.getItem("user"))._id` and sends it to the API as
+the thing being asked about — which is audit finding C-01.
+
+Three rules:
+
+- **Auth is enforced in the layout** (`requireSession` / `requireHost`), so
+  it covers every route added later without anyone remembering. Hiding a
+  button in a client component is not authorization.
+- **Every account query takes the caller's identity and filters in SQL**
+  (`lib/db/src/queries/account.ts`). There is no "all reservations"
+  function to call by accident. The old `/reservations` page fetches every
+  booking on the platform and prints each guest's email and phone
+  (`reservations/page.js:314–315`) behind a `useState(false)` gate — a
+  personal-data breach, and the reason this rule exists.
+- **Password and session primitives live in `lib/auth`, once.** Extracted
+  from `artifacts/api-server/src/routes/test-auth.ts`, byte-compatible.
+  Never add a second implementation of password verification.
+
+Login must not distinguish "no such account" from "wrong password" — in the
+message *or* in the timing. See `docs/ACCOUNTS.md`.
+
 ### Data conventions
 
 - **Money is always integer cents.** Never float, never `numeric`.
@@ -243,6 +271,13 @@ Each of these cost real debugging time. Don't rediscover them.
   `--font-fraunces` only exists on `<body>`, that substitution fails at
   `:root`, the property becomes guaranteed-invalid, and every descendant
   inherits the invalid value. Fonts load, build passes, nothing uses them.
+- **`typedRoutes` needs `href: Route`, not `string`.** With it on, a nav
+  item pointing at a page nobody built is a build failure instead of a 404
+  a user finds. Runtime values (a `?next=` param) need an explicit cast —
+  the safety there comes from validating the value, not from the type.
+- **A page file may only export the fields Next.js expects.** Exporting a
+  helper from `page.tsx` fails the build (`"formatStay" is not a valid Page
+  export field`). Shared helpers go in `app/_lib/`.
 - **A verify script must not assume an empty table.** The destination
   membership assertions passed only while `listings` was empty; the moment
   demo data existed, eight of them were testing the database's contents
@@ -269,6 +304,7 @@ Each of these cost real debugging time. Don't rediscover them.
 
 - `docs/REBUILD-PLAN.md` — phased roadmap, gates, and what's deliberately deferred
 - `docs/DESTINATIONS.md` — the "Obľúbené miesta" catalogue, awaiting the owner's corrections
+- `docs/ACCOUNTS.md` — guest account and host area: what the old ones do, what replaced them
 - `audit/REPORT.md` — 63 findings against the old system, each with `file:line`
 - `audit/DESIGN-AUDIT.md` — 22 design/UX findings, page by page
 - `audit/DECISIONS-NEEDED.md` — 10 open product/legal decisions
