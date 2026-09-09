@@ -75,15 +75,6 @@ PORT = "21864"
 BASE_PATH = "/"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Putko Next Preview"
-
-[[workflows.workflow]]
 name = "Putko Next Preview"
 author = "agent"
 
