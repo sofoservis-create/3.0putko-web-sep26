@@ -1,215 +1,259 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { FormContext } from "../../FormContext";
-import { Plus, Home, MapPin, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
-import { listHostAccommodations, deleteHostAccommodation } from "../../utlis/guestAccountApi";
+import { Plus, Home, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
+import { useHostListings } from "../../host/HostListingsContext";
+import { countByStatus, listingName } from "../../host/hostListingModel";
+import ListingCard from "./ListingCard";
+import DeleteListingDialog from "./DeleteListingDialog";
 
-export default function AccommodationsList({ onOpen, onCreate, onChanged }) {
+// Slovak plural forms: 1 → one, 2–4 → few, 0 and 5+ → many.
+const skCount = (n, one, few, many) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
+
+const FILTERS = [
+  { key: "ALL", label: { en: "All", sk: "Všetky" } },
+  { key: "DRAFT", label: { en: "Drafts", sk: "Koncepty" } },
+  { key: "READY", label: { en: "Ready", sk: "Pripravené" } },
+  { key: "LIVE", label: { en: "Live", sk: "Zverejnené" } },
+];
+
+export default function AccommodationsList({ onOpen, onCreate }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
-  
-  const [accommodations, setAccommodations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const en = language === "en";
+
+  const { listings, loaded, loading, refreshing, error, refresh, deleteListing, deletingIds } =
+    useHostListings();
+
   const [showRequirements, setShowRequirements] = useState(false);
+  const [filter, setFilter] = useState("ALL");
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const counts = useMemo(() => countByStatus(listings), [listings]);
+  const activeFilter = counts[filter] === 0 && filter !== "ALL" ? "ALL" : filter;
+  const visible = useMemo(
+    () => (activeFilter === "ALL" ? listings : listings.filter((item) => item.status === activeFilter)),
+    [listings, activeFilter],
+  );
+
+  const requestDelete = (listing) => {
+    setDeleteError(null);
+    setPendingDelete(listing);
+  };
+
+  const cancelDelete = () => {
+    if (pendingDelete && deletingIds.has(pendingDelete.id)) return;
+    setPendingDelete(null);
+    setDeleteError(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || deletingIds.has(pendingDelete.id)) return;
+    const target = pendingDelete;
+    setDeleteError(null);
     try {
-      const res = await listHostAccommodations();
-      setAccommodations(res.accommodations || []);
+      await deleteListing(target.id);
+      setPendingDelete(null);
+      toast.success(
+        en
+          ? `"${listingName(target, language)}" was deleted.`
+          : `Ponuka „${listingName(target, language)}“ bola vymazaná.`,
+      );
     } catch (err) {
-      toast.error(language === "en" ? "Failed to load accommodations" : "Nepodarilo sa načítať ubytovania");
-    } finally {
-      setLoading(false);
+      setDeleteError(err instanceof Error ? err : new Error("Delete failed"));
     }
   };
 
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const renderSkeleton = () => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 animate-pulse" aria-busy="true">
+      {[1, 2].map((i) => (
+        <div key={i} className="h-56 rounded-3xl border border-neutral-200 bg-white" />
+      ))}
+    </div>
+  );
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(language === "en" ? "Delete this accommodation?" : "Vymazať toto ubytovanie?")) return;
-    try {
-      await deleteHostAccommodation(id);
-      toast.success(language === "en" ? "Deleted" : "Vymazané");
-      onChanged?.();
-      loadData();
-    } catch (err) {
-      toast.error(language === "en" ? "Failed to delete" : "Nepodarilo sa vymazať");
-    }
-  };
-
-  return (
-    <div className="max-w-5xl mx-auto px-4 md:px-0 animate-fadeIn">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8 pt-2 md:pt-0">
+  const renderError = () => (
+    <div role="alert" className="flex flex-col gap-4 rounded-3xl border border-red-200 bg-red-50 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <AlertCircle size={22} className="mt-0.5 shrink-0 text-red-600" />
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#1E3E2B] tracking-tight">
-            {language === "en" ? "Listings" : "Ponuky"}
-          </h1>
-          <p className="text-neutral-500 mt-2 text-[15px]">
-            {language === "en" ? "Manage your properties and drafts." : "Spravujte svoje ubytovania a koncepty."}
+          <h2 className="text-lg font-bold text-red-700">
+            {en ? "We couldn't load your listings" : "Nepodarilo sa načítať vaše ponuky"}
+          </h2>
+          <p className="mt-1 text-sm text-red-600">
+            {en ? "Check your connection and try again." : "Skontrolujte pripojenie a skúste to znova."}
           </p>
         </div>
-        {accommodations.length > 0 && (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#DFBA73] text-[#1E3E2B] font-bold hover:bg-[#c9a561] transition-colors shadow-sm w-full sm:w-auto"
-          >
-            <Plus size={20} />
-            {language === "en" ? "Add Listing" : "Pridať ponuku"}
-          </button>
-        )}
       </div>
+      <button
+        type="button"
+        onClick={() => refresh()}
+        disabled={loading}
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60"
+      >
+        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+        {en ? "Retry" : "Skúsiť znova"}
+      </button>
+    </div>
+  );
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 animate-pulse">
-          {[1,2,3].map(i => <div key={i} className="bg-white border border-neutral-200 rounded-3xl h-80" />)}
+  const renderEmpty = () => (
+    <div className="flex flex-col items-center rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm md:p-16">
+      <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-[#DFBA73]/10 text-[#DFBA73]">
+        <Home size={40} />
+      </div>
+      <h2 className="mb-3 text-2xl font-bold text-[#1E3E2B]">
+        {en ? "Add your first accommodation" : "Pridajte svoje prvé ubytovanie"}
+      </h2>
+      <p className="mb-10 max-w-sm text-[16px] leading-relaxed text-neutral-500">
+        {en
+          ? "Set aside about 10 minutes. You will need property details, photos, pricing, availability, and payout readiness."
+          : "Vyhraďte si približne 10 minút. Budete potrebovať údaje o ubytovaní, fotografie, ceny, dostupnosť a nastavenie výplat."}
+      </p>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1E3E2B] px-8 py-4 font-bold text-white shadow-md transition-colors hover:bg-[#163021] sm:w-auto"
+      >
+        <Plus size={20} />
+        {en ? "Start" : "Začať"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setShowRequirements((current) => !current)}
+        aria-expanded={showRequirements}
+        className="mt-4 min-h-11 px-4 text-sm font-bold text-[#1E3E2B] underline decoration-[#DFBA73] decoration-2 underline-offset-4"
+      >
+        {en ? "What will I need?" : "Čo budem potrebovať?"}
+      </button>
+      {showRequirements && (
+        <div className="mt-3 max-w-md rounded-2xl bg-[#F8F4EA] p-4 text-left text-sm leading-6 text-neutral-700">
+          {en
+            ? "Address and capacity, amenities, at least one photo, nightly price, house rules, availability, calendar choice, and payout acknowledgement."
+            : "Adresu a kapacitu, vybavenie, aspoň jednu fotografiu, cenu za noc, pravidlá, dostupnosť, voľbu kalendára a potvrdenie výplat."}
         </div>
-      ) : accommodations.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-neutral-200 p-8 md:p-16 text-center flex flex-col items-center shadow-sm">
-          <div className="w-24 h-24 bg-[#DFBA73]/10 text-[#DFBA73] rounded-full flex items-center justify-center mb-8">
-            <Home size={40} />
-          </div>
-          <h3 className="text-2xl font-bold text-[#1E3E2B] mb-3">
-            {language === "en" ? "Add your first accommodation" : "Pridajte svoje prvé ubytovanie"}
-          </h3>
-          <p className="text-neutral-500 mb-10 max-w-sm text-[16px] leading-relaxed">
-            {language === "en" 
-              ? "Set aside about 10 minutes. You will need property details, photos, pricing, availability, and payout readiness."
-              : "Vyhraďte si približne 10 minút. Budete potrebovať údaje o ubytovaní, fotografie, ceny, dostupnosť a nastavenie výplat."}
-          </p>
+      )}
+    </div>
+  );
+
+  const renderList = () => (
+    <>
+      {error && loaded && (
+        <div role="status" className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            {en
+              ? "Showing the last loaded listings. The latest refresh failed."
+              : "Zobrazujú sa naposledy načítané ponuky. Posledné obnovenie zlyhalo."}
+          </span>
           <button
             type="button"
-            onClick={onCreate}
-            className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-[#1E3E2B] text-white font-bold hover:bg-[#163021] transition-colors w-full sm:w-auto shadow-md"
+            onClick={() => refresh({ background: true })}
+            disabled={refreshing}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 font-bold text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-60"
           >
-            <Plus size={20} />
-            {language === "en" ? "Start" : "Začať"}
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            {en ? "Retry" : "Skúsiť znova"}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowRequirements((current) => !current)}
-            aria-expanded={showRequirements}
-            className="mt-4 min-h-11 px-4 text-sm font-bold text-[#1E3E2B] underline decoration-[#DFBA73] decoration-2 underline-offset-4"
-          >
-            {language === "en" ? "What will I need?" : "Čo budem potrebovať?"}
-          </button>
-          {showRequirements && (
-            <div className="mt-3 max-w-md rounded-2xl bg-[#F8F4EA] p-4 text-left text-sm leading-6 text-neutral-700">
-              {language === "en"
-                ? "Address and capacity, amenities, at least one photo, nightly price, house rules, availability, calendar choice, and payout acknowledgement."
-                : "Adresu a kapacitu, vybavenie, aspoň jednu fotografiu, cenu za noc, pravidlá, dostupnosť, voľbu kalendára a potvrdenie výplat."}
-            </div>
-          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-24 md:pb-8">
-          {accommodations.map(acc => {
-            const isLive = acc.status === "LIVE";
-            const isReady = acc.status === "READY";
-            const isDraft = acc.status === "DRAFT";
+      )}
 
+      {listings.length > 1 && (
+        <div
+          role="tablist"
+          aria-label={en ? "Filter listings by status" : "Filtrovať ponuky podľa stavu"}
+          className="mb-5 flex flex-wrap gap-2"
+        >
+          {FILTERS.map((item) => {
+            const count = item.key === "ALL" ? listings.length : counts[item.key];
+            if (item.key !== "ALL" && count === 0) return null;
+            const active = activeFilter === item.key;
             return (
-              <div key={acc.id} className="bg-white rounded-3xl border border-neutral-200 overflow-hidden hover:shadow-lg transition-all group flex flex-col relative">
-                <div className="aspect-[4/3] bg-neutral-100 relative">
-                  {acc.data.photoUrls?.[0] ? (
-                    <img
-                      src={acc.data.photoUrls[0]}
-                      className="w-full h-full object-cover"
-                      alt={acc.data.name || (language === "en" ? "Accommodation" : "Ubytovanie")}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-neutral-300 bg-neutral-100">
-                      <Home size={48} strokeWidth={1.5} />
-                    </div>
-                  )}
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <div className={`px-3 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-lg shadow-md backdrop-blur-md flex items-center gap-1.5 ${
-                      isLive ? "bg-green-500/90 text-white" :
-                      isReady ? "bg-white/90 text-green-700" :
-                      "bg-white/90 text-neutral-600"
-                    }`}>
-                      {isLive && <CheckCircle2 size={14} />}
-                      {isReady && <CheckCircle2 size={14} />}
-                      {isDraft && <AlertCircle size={14} />}
-                      {isLive
-                        ? (language === "en" ? "Live" : "Aktívne")
-                        : isReady
-                          ? (language === "en" ? "Ready" : "Pripravené")
-                          : (language === "en" ? "Draft" : "Koncept")}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-5 flex-1 flex flex-col">
-                  <h3 className="font-bold text-lg text-[#1E3E2B] mb-1.5 line-clamp-1">
-                    {acc.data.name || (language === "en" ? "Unnamed Property" : "Ubytovanie bez názvu")}
-                  </h3>
-                  <div className="flex items-center text-[14px] font-medium text-neutral-500 mb-6 gap-1.5">
-                    <MapPin size={16} />
-                    <span className="line-clamp-1">{[acc.data.city, acc.data.country].filter(Boolean).join(", ") || (language === "en" ? "Location missing" : "Lokalita chýba")}</span>
-                  </div>
-
-                  <div className="mt-auto">
-                    {isDraft && (
-                      <div className="mb-5 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
-                        <div className="flex justify-between text-xs font-bold text-neutral-600 mb-2">
-                          <span>{language === "en" ? "Setup progress" : "Priebeh nastavenia"}</span>
-                          <span>{acc.completionPercent}%</span>
-                        </div>
-                        <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
-                          <div className="bg-[#DFBA73] h-full rounded-full transition-all duration-500" style={{ width: `${acc.completionPercent}%` }} />
-                        </div>
-                        {acc.missingRequirements?.[0] && (
-                          <p className="mt-2 text-xs font-medium text-neutral-500">
-                            {language === "en" ? "Next required item: " : "Ďalej doplňte: "}
-                            {acc.missingRequirements[0]}
-                          </p>
-                        )}
-                        {acc.updatedAt && (
-                          <p className="mt-1 text-xs text-neutral-400">
-                            {language === "en" ? "Saved " : "Uložené "}
-                            {new Intl.DateTimeFormat(language === "en" ? "en-GB" : "sk-SK", {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            }).format(new Date(acc.updatedAt))}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
-                      <button
-                        type="button"
-                        onClick={() => onOpen(acc.id, { review: isReady })}
-                        className="flex-1 px-4 py-3.5 bg-neutral-50 hover:bg-[#1E3E2B] text-[#1E3E2B] hover:text-white rounded-xl text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
-                      >
-                        {isDraft
-                          ? (language === "en" ? "Continue setup" : "Pokračovať")
-                          : isReady
-                            ? (language === "en" ? "Review and publish" : "Skontrolovať a zverejniť")
-                            : (language === "en" ? "Manage" : "Spravovať")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(acc.id)}
-                        className="p-3.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100"
-                        title={language === "en" ? "Delete" : "Vymazať"}
-                        aria-label={language === "en" ? "Delete" : "Vymazať"}
-                      >
-                        <Trash2 size={20} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFilter(item.key)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-bold transition-colors ${
+                  active
+                    ? "border-[#1E3E2B] bg-[#1E3E2B] text-white"
+                    : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                }`}
+              >
+                {item.label[language]}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? "bg-white/15 text-white" : "bg-neutral-100 text-neutral-600"}`}>
+                  {count}
+                </span>
+              </button>
             );
           })}
         </div>
       )}
+
+      <div className="grid grid-cols-1 gap-4 pb-8 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
+        {visible.map((listing) => (
+          <ListingCard
+            key={listing.id}
+            listing={listing}
+            language={language}
+            onOpen={onOpen}
+            onDelete={requestDelete}
+            deleting={deletingIds.has(listing.id)}
+          />
+        ))}
+      </div>
+    </>
+  );
+
+  const showInitialLoading = !loaded && loading;
+  const showInitialError = !loaded && !loading && error;
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 animate-fadeIn md:px-0">
+      <div className="mb-6 flex flex-col gap-4 pt-2 sm:flex-row sm:items-center sm:justify-between md:mb-8 md:pt-0">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#1E3E2B] md:text-3xl">
+            {en ? "Listings" : "Ponuky"}
+          </h1>
+          <p className="mt-2 text-[15px] text-neutral-500">
+            {loaded && listings.length > 0
+              ? en
+                ? `${listings.length} ${listings.length === 1 ? "property" : "properties"} · ${counts.DRAFT} ${counts.DRAFT === 1 ? "draft" : "drafts"}, ${counts.READY} ready, ${counts.LIVE} live`
+                : `${skCount(listings.length, "ubytovanie", "ubytovania", "ubytovaní")} · ${skCount(counts.DRAFT, "koncept", "koncepty", "konceptov")}, ${skCount(counts.READY, "pripravená", "pripravené", "pripravených")}, ${skCount(counts.LIVE, "zverejnená", "zverejnené", "zverejnených")}`
+              : en
+                ? "Manage your properties and drafts."
+                : "Spravujte svoje ubytovania a koncepty."}
+          </p>
+        </div>
+        {loaded && listings.length > 0 && (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#DFBA73] px-6 py-3.5 font-bold text-[#1E3E2B] shadow-sm transition-colors hover:bg-[#c9a561] sm:w-auto"
+          >
+            <Plus size={20} />
+            {en ? "Add listing" : "Pridať ponuku"}
+          </button>
+        )}
+      </div>
+
+      {showInitialLoading
+        ? renderSkeleton()
+        : showInitialError
+          ? renderError()
+          : listings.length === 0
+            ? renderEmpty()
+            : renderList()}
+
+      <DeleteListingDialog
+        listing={pendingDelete}
+        language={language}
+        pending={Boolean(pendingDelete && deletingIds.has(pendingDelete.id))}
+        error={deleteError}
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

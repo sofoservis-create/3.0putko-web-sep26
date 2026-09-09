@@ -17,25 +17,35 @@ import {
   Trash2,
   Loader2
 } from "lucide-react";
-import { 
-  createHostAccommodation, 
-  getHostAccommodation, 
-  updateHostAccommodation, 
-  publishHostAccommodation 
-} from "../../utlis/guestAccountApi";
+import { getHostAccommodation } from "../../utlis/guestAccountApi";
 import { toast } from "react-toastify";
+import { useHostListings } from "../../host/HostListingsContext";
+import {
+  EDITOR_STEP_IDS,
+  EDITOR_STEP_TITLES,
+  LAST_VISITED_STEP_KEY,
+  resumeStepIndex,
+} from "../../host/hostListingModel";
 
-const STEPS = [
-  { id: "basics", icon: Home, title: { en: "Basics", sk: "Základy" } },
-  { id: "location", icon: MapPin, title: { en: "Location", sk: "Lokalita" } },
-  { id: "spaces", icon: BedDouble, title: { en: "Rooms & Guests", sk: "Izby a hostia" } },
-  { id: "amenities", icon: Wifi, title: { en: "Amenities", sk: "Vybavenie" } },
-  { id: "photos", icon: ImageIcon, title: { en: "Photos", sk: "Fotografie" } },
-  { id: "pricing", icon: CreditCard, title: { en: "Pricing", sk: "Ceny" } },
-  { id: "availability", icon: CalendarIcon, title: { en: "Policies", sk: "Pravidlá" } },
-  { id: "calendar", icon: CalendarIcon, title: { en: "Calendar", sk: "Kalendár" } },
-  { id: "readiness", icon: Landmark, title: { en: "Payout Account", sk: "Výplatný účet" } }
-];
+const STEP_ICONS = {
+  basics: Home,
+  location: MapPin,
+  spaces: BedDouble,
+  amenities: Wifi,
+  photos: ImageIcon,
+  pricing: CreditCard,
+  availability: CalendarIcon,
+  calendar: CalendarIcon,
+  readiness: Landmark,
+};
+
+// Step order and titles are shared with the listings hub so "resume at the
+// right step" and "Next: <step>" labels always agree with the editor.
+const STEPS = EDITOR_STEP_IDS.map((id) => ({
+  id,
+  icon: STEP_ICONS[id],
+  title: EDITOR_STEP_TITLES[id],
+}));
 
 const AMENITIES_LIST = [
   { id: "wifi", en: "WiFi", sk: "WiFi" },
@@ -57,6 +67,7 @@ export default function AccommodationForm({
 }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
+  const { createListing, saveListing, publishListing } = useHostListings();
   const [localId, setLocalId] = useState(accommodationId);
   // Mirrors localId synchronously so the route-sync effect below can tell a
   // URL change we caused (first save replaced /new with the new id) from a
@@ -95,15 +106,31 @@ export default function AccommodationForm({
     setCompletion({});
     setCurrentStep(0);
     setShowPreview(false);
+    // In-flight save/publish/load calls from the previous session must not
+    // leave the new editor's controls disabled; their results are dropped by
+    // the session guard below.
+    setLoading(false);
+    setSaving(false);
+    setPublishing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accommodationId]);
+
+  // Leaving the editor (Listings, Today, menu) unmounts it. Invalidate the
+  // session so a create/save/publish that finishes afterwards cannot call the
+  // navigation callbacks (`onCreated`, `onReviewDismiss`) or touch state. The
+  // shared store still records the server response, so the list stays right.
+  useEffect(() => {
+    return () => {
+      sessionRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
       return;
     }
-    loadData();
+    loadData({ resume: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId]);
 
@@ -164,21 +191,33 @@ export default function AccommodationForm({
     };
   }, [showPreview]);
 
-  const loadData = async () => {
-    const session = sessionRef.current;
+  // `resume` is only set when the editor opens a listing (route change), so
+  // a DRAFT lands on its last visited / first incomplete step. Reloads after
+  // publish keep the current step.
+  const applyServerListing = (res) => {
+    setData(res.data || {});
+    setStatus(res.status);
+    setCompletion({
+      percent: res.completionPercent,
+      completedSteps: res.completedSteps || [],
+      missing: res.missingRequirements || [],
+      canPublish: res.canPublish
+    });
+  };
+
+  // `session` and `id` are bound to the editing session that asked for the
+  // load. A caller that awaited something before calling loadData passes the
+  // session it started with, so a stale continuation can never fetch its own
+  // listing into a newer session's form.
+  const loadData = async ({ resume = false, session = sessionRef.current, id = localIdRef.current } = {}) => {
+    if (session !== sessionRef.current) return;
     setLoading(true);
     try {
-      if (localId) {
-        const res = await getHostAccommodation(localId);
+      if (id) {
+        const res = await getHostAccommodation(id);
         if (session !== sessionRef.current) return;
-        setData(res.data || {});
-        setStatus(res.status);
-        setCompletion({
-          percent: res.completionPercent,
-          completedSteps: res.completedSteps || [],
-          missing: res.missingRequirements || [],
-          canPublish: res.canPublish
-        });
+        applyServerListing(res);
+        if (resume) setCurrentStep(resumeStepIndex(res));
       }
     } catch (err) {
       if (session !== sessionRef.current) return;
@@ -194,7 +233,7 @@ export default function AccommodationForm({
     try {
       let idToSave = localId;
       if (!idToSave) {
-        const created = await createHostAccommodation();
+        const created = await createListing();
         if (session !== sessionRef.current) return null;
         idToSave = created.id;
         localIdRef.current = idToSave;
@@ -203,16 +242,17 @@ export default function AccommodationForm({
         onCreated?.(idToSave);
       }
 
-      const res = await updateHostAccommodation(idToSave, data);
-      if (session !== sessionRef.current) return null;
-      setData(res.data || {});
-      setStatus(res.status);
-      setCompletion({
-        percent: res.completionPercent,
-        completedSteps: res.completedSteps || [],
-        missing: res.missingRequirements || [],
-        canPublish: res.canPublish
+      // Remember where the host will be after this save so "Continue setup"
+      // reopens the draft on the same step. Stored inside the JSON payload;
+      // the server ignores it for completion and publishing.
+      const nextIndex =
+        moveToNext && currentStep < STEPS.length - 1 ? currentStep + 1 : currentStep;
+      const res = await saveListing(idToSave, {
+        ...data,
+        [LAST_VISITED_STEP_KEY]: STEPS[nextIndex].id,
       });
+      if (session !== sessionRef.current) return null;
+      applyServerListing(res);
 
       toast.success(language === "en" ? "Saved successfully" : "Úspešne uložené");
 
@@ -239,16 +279,23 @@ export default function AccommodationForm({
 
   const handlePublish = async () => {
     if (!localId || !completion.canPublish) return;
+    const session = sessionRef.current;
+    const id = localId;
     setPublishing(true);
     try {
-      await publishHostAccommodation(localId);
+      const published = await publishListing(id);
+      // The shared store already holds the published listing; only this
+      // editor session may apply it to the form.
+      if (session !== sessionRef.current) return;
       toast.success(language === "en" ? "Published successfully!" : "Úspešne zverejnené!");
-      loadData();
+      if (published?.id === id) applyServerListing(published);
+      else loadData({ session, id });
       closePreview();
     } catch (err) {
+      if (session !== sessionRef.current) return;
       toast.error(language === "en" ? "Failed to publish" : "Nepodarilo sa zverejniť");
     } finally {
-      setPublishing(false);
+      if (session === sessionRef.current) setPublishing(false);
     }
   };
 
@@ -369,6 +416,19 @@ export default function AccommodationForm({
 
           {/* Form Content */}
           <div className="p-2 md:p-8 flex-1">
+            {status === "LIVE" && (
+              <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
+                <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-green-600" />
+                <div className="text-sm text-green-900">
+                  <p className="font-bold">{language === "en" ? "This listing is live" : "Táto ponuka je zverejnená"}</p>
+                  <p className="mt-0.5 text-[13px] text-green-800">
+                    {language === "en"
+                      ? "Saved changes update the published listing. It returns to draft if a required detail is removed."
+                      : "Uložené zmeny sa prejavia v zverejnenej ponuke. Ak odstránite povinný údaj, vráti sa do konceptu."}
+                  </p>
+                </div>
+              </div>
+            )}
             {currentStep === 0 && (
               <div className="space-y-6">
                 <div>
@@ -775,11 +835,13 @@ export default function AccommodationForm({
               <button
                 type="button"
                 onClick={handlePublish}
-                disabled={!completion.canPublish || publishing}
+                disabled={!completion.canPublish || publishing || status === "LIVE"}
                 className="px-8 py-3.5 rounded-xl font-bold text-white bg-[#1E3E2B] hover:bg-[#163021] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
               >
                 {publishing && <Loader2 className="animate-spin" size={18} />}
-                {language === "en" ? "Publish Listing" : "Zverejniť ponuku"}
+                {status === "LIVE"
+                  ? (language === "en" ? "Already live" : "Už zverejnené")
+                  : (language === "en" ? "Publish Listing" : "Zverejniť ponuku")}
               </button>
             </div>
           </div>

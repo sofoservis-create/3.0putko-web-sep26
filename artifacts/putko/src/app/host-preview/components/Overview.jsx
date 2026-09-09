@@ -1,49 +1,42 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useMemo } from "react";
 import { FormContext } from "../../FormContext";
 import {
   House, ArrowRight, CheckCircle2, AlertCircle, Plus, BookOpenText, RefreshCw,
 } from "lucide-react";
 import Link from "@/app/components/NextLink";
-import { listHostAccommodations } from "../../utlis/guestAccountApi";
+import { useHostListings } from "../../host/HostListingsContext";
+import {
+  countAttentionListings,
+  countByStatus,
+  listingDisplayPercent,
+  listingName,
+  nextStepTitle,
+  selectPriorityListing,
+} from "../../host/hostListingModel";
 
 const HOST_GUIDE_PATH = "/user-guide";
 
 export default function Overview({ onOpenListing, onCreateListing, onOpenListings }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
-  const [accommodations, setAccommodations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const en = language === "en";
+  const { listings, loaded, loading, error, refresh } = useHostListings();
 
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    listHostAccommodations()
-      .then((res) => setAccommodations(res.accommodations || []))
-      .catch((err) => setError(err?.message || "error"))
-      .finally(() => setLoading(false));
-  };
+  const counts = useMemo(() => countByStatus(listings), [listings]);
+  const target = useMemo(() => selectPriorityListing(listings), [listings]);
+  const attention = countAttentionListings(listings);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const counts = accommodations.reduce(
-    (acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
-      return acc;
-    },
-    { DRAFT: 0, READY: 0, LIVE: 0 },
-  );
+  const showLoading = !loaded && loading;
+  const showError = !loaded && !loading && error;
 
   const getPriority = () => {
-    if (loading || error) return null;
-    if (accommodations.length === 0) {
+    if (showLoading || showError) return null;
+    if (listings.length === 0) {
       return {
         type: "new",
-        title: language === "en" ? "Create your first listing" : "Vytvorte svoju prvú ponuku",
-        desc: language === "en" ? "Start earning by sharing your space." : "Začnite zarábať zdieľaním svojho priestoru.",
-        action: language === "en" ? "Get started" : "Začať",
+        title: en ? "Create your first listing" : "Vytvorte svoju prvú ponuku",
+        desc: en ? "Start earning by sharing your space." : "Začnite zarábať zdieľaním svojho priestoru.",
+        action: en ? "Get started" : "Začať",
         onClick: onCreateListing,
         icon: Plus,
         color: "text-[#DFBA73]",
@@ -52,29 +45,21 @@ export default function Overview({ onOpenListing, onCreateListing, onOpenListing
         btnColor: "bg-[#DFBA73] text-[#1E3E2B] hover:bg-[#c9a561]",
       };
     }
-    const draft = accommodations.find((a) => a.status === "DRAFT");
-    if (draft) {
-      return {
-        type: "draft",
-        title: language === "en" ? "Finish your listing" : "Dokončite svoju ponuku",
-        desc: draft.data.name || (language === "en" ? "Unnamed Property" : "Ubytovanie bez názvu"),
-        action: language === "en" ? "Continue setup" : "Pokračovať",
-        onClick: () => onOpenListing(draft.id),
-        icon: AlertCircle,
-        color: "text-amber-600",
-        bg: "bg-amber-50",
-        border: "border-amber-200",
-        btnColor: "bg-amber-500 text-white hover:bg-amber-600",
-      };
-    }
-    const ready = accommodations.find((a) => a.status === "READY");
-    if (ready) {
+    const name = listingName(target, language);
+    const others = attention - 1;
+    const othersCopy =
+      others > 0
+        ? en
+          ? ` · ${others} more ${others === 1 ? "listing needs" : "listings need"} attention`
+          : ` · ${others === 1 ? "ešte 1 ponuka potrebuje" : others < 5 ? `ešte ${others} ponuky potrebujú` : `ešte ${others} ponúk potrebuje`} pozornosť`
+        : "";
+    if (target.status === "READY") {
       return {
         type: "ready",
-        title: language === "en" ? "Ready to publish" : "Pripravené na zverejnenie",
-        desc: ready.data.name || (language === "en" ? "Unnamed Property" : "Ubytovanie bez názvu"),
-        action: language === "en" ? "Publish now" : "Zverejniť",
-        onClick: () => onOpenListing(ready.id, { review: true }),
+        title: en ? "Ready to publish" : "Pripravené na zverejnenie",
+        desc: `${name}${othersCopy}`,
+        action: en ? "Review and publish" : "Skontrolovať a zverejniť",
+        onClick: () => onOpenListing(target.id, { review: true }),
         icon: CheckCircle2,
         color: "text-green-600",
         bg: "bg-green-50",
@@ -82,12 +67,30 @@ export default function Overview({ onOpenListing, onCreateListing, onOpenListing
         btnColor: "bg-green-600 text-white hover:bg-green-700",
       };
     }
+    if (target.status === "DRAFT") {
+      const step = nextStepTitle(target, language);
+      const percent = listingDisplayPercent(target);
+      return {
+        type: "draft",
+        title: en ? "Finish your listing" : "Dokončite svoju ponuku",
+        desc: `${name} · ${percent}%${step ? ` · ${en ? "Next" : "Ďalej"}: ${step}` : ""}${othersCopy}`,
+        action: en ? "Continue setup" : "Pokračovať v nastavení",
+        onClick: () => onOpenListing(target.id),
+        icon: AlertCircle,
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        border: "border-amber-200",
+        btnColor: "bg-amber-500 text-white hover:bg-amber-600",
+      };
+    }
     return {
       type: "all_good",
-      title: language === "en" ? "All listings are live" : "Všetky ponuky sú aktívne",
-      desc: language === "en" ? "Keep your listing details up to date." : "Udržujte údaje o ponukách aktuálne.",
-      action: language === "en" ? "Manage listings" : "Spravovať ponuky",
-      onClick: onOpenListings,
+      title: en ? "All listings are live" : "Všetky ponuky sú zverejnené",
+      desc: en
+        ? `${name} · Keep your listing details up to date.`
+        : `${name} · Udržujte údaje o ponukách aktuálne.`,
+      action: en ? "Manage listing" : "Spravovať ponuku",
+      onClick: () => onOpenListing(target.id),
       icon: House,
       color: "text-[#1E3E2B]",
       bg: "bg-white",
@@ -113,49 +116,50 @@ export default function Overview({ onOpenListing, onCreateListing, onOpenListing
     <div className="max-w-4xl mx-auto px-4 md:px-0 animate-fadeIn space-y-8">
       <div className="pt-2 md:pt-4">
         <h1 className="text-3xl font-bold text-[#1E3E2B] tracking-tight">
-          {language === "en" ? "Welcome back" : "Vitajte späť"}
+          {en ? "Welcome back" : "Vitajte späť"}
         </h1>
         <p className="text-neutral-500 mt-2 text-[16px]">
-          {language === "en" ? "Here's what's happening with your properties today." : "Tu je prehľad vašich ubytovaní na dnes."}
+          {en ? "Here's what's happening with your properties today." : "Tu je prehľad vašich ubytovaní na dnes."}
         </p>
       </div>
 
-      {loading ? (
+      {showLoading ? (
         <div className="w-full h-40 bg-neutral-100 rounded-3xl animate-pulse" aria-busy="true" />
-      ) : error ? (
+      ) : showError ? (
         <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-red-700">
-              {language === "en" ? "We couldn't load your listings" : "Nepodarilo sa načítať vaše ponuky"}
+              {en ? "We couldn't load your listings" : "Nepodarilo sa načítať vaše ponuky"}
             </h2>
             <p className="text-sm text-red-600 mt-1">
-              {language === "en" ? "Check your connection and try again." : "Skontrolujte pripojenie a skúste to znova."}
+              {en ? "Check your connection and try again." : "Skontrolujte pripojenie a skúste to znova."}
             </p>
           </div>
           <button
             type="button"
-            onClick={load}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+            onClick={() => refresh()}
+            disabled={loading}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-red-700 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-60"
           >
-            <RefreshCw size={16} />
-            {language === "en" ? "Retry" : "Skúsiť znova"}
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            {en ? "Retry" : "Skúsiť znova"}
           </button>
         </div>
       ) : priority ? (
         <div className={`relative overflow-hidden rounded-3xl border ${priority.border} ${priority.bg} p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm transition-all`}>
-          <div className="flex items-start gap-5">
+          <div className="flex items-start gap-5 min-w-0">
             <div className={`p-4 rounded-2xl bg-white shadow-sm shrink-0 ${priority.color}`}>
               <priority.icon size={32} />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className={`text-xl font-bold mb-1.5 ${priority.type === "all_good" ? "text-[#1E3E2B]" : "text-neutral-900"}`}>{priority.title}</h2>
-              <p className="text-neutral-600 text-[15px] max-w-md leading-relaxed">{priority.desc}</p>
+              <p className="text-neutral-600 text-[15px] max-w-md leading-relaxed break-words">{priority.desc}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={priority.onClick}
-            className={`shrink-0 inline-flex min-h-11 items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto ${priority.btnColor}`}
+            className={`shrink-0 inline-flex min-h-12 items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto ${priority.btnColor}`}
           >
             {priority.action}
             <ArrowRight size={18} />
@@ -163,9 +167,9 @@ export default function Overview({ onOpenListing, onCreateListing, onOpenListing
         </div>
       ) : null}
 
-      {!loading && !error && accommodations.length > 0 && (
+      {loaded && listings.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{language === "en" ? "Your listings" : "Vaše ponuky"}</h3>
+          <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{en ? "Your listings" : "Vaše ponuky"}</h3>
           <div className="grid grid-cols-3 gap-3 md:gap-4">
             {STATUS_TILES.map((tile) => (
               <button
@@ -183,28 +187,28 @@ export default function Overview({ onOpenListing, onCreateListing, onOpenListing
       )}
 
       <div>
-        <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{language === "en" ? "Quick actions" : "Rýchle akcie"}</h3>
+        <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{en ? "Quick actions" : "Rýchle akcie"}</h3>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           <button type="button" onClick={onOpenListings} className={quickActionClass}>
             <div className={quickIconClass}><House size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{language === "en" ? "Listings" : "Ponuky"}</span>
+            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Listings" : "Ponuky"}</span>
             <span className="text-[13px] text-neutral-500 font-medium">
-              {loading
+              {!loaded
                 ? "…"
-                : language === "en"
-                  ? `${accommodations.length} ${accommodations.length === 1 ? "property" : "properties"}`
-                  : `${accommodations.length} ${accommodations.length === 1 ? "ubytovanie" : accommodations.length < 5 ? "ubytovania" : "ubytovaní"}`}
+                : en
+                  ? `${listings.length} ${listings.length === 1 ? "property" : "properties"}`
+                  : `${listings.length} ${listings.length === 1 ? "ubytovanie" : listings.length >= 2 && listings.length <= 4 ? "ubytovania" : "ubytovaní"}`}
             </span>
           </button>
           <button type="button" onClick={onCreateListing} className={quickActionClass}>
             <div className={quickIconClass}><Plus size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{language === "en" ? "Add listing" : "Pridať ponuku"}</span>
-            <span className="text-[13px] text-neutral-500 font-medium">{language === "en" ? "Start a new draft" : "Nový koncept"}</span>
+            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Add listing" : "Pridať ponuku"}</span>
+            <span className="text-[13px] text-neutral-500 font-medium">{en ? "Start a new draft" : "Nový koncept"}</span>
           </button>
           <Link href={HOST_GUIDE_PATH} className={`${quickActionClass} col-span-2 lg:col-span-1`}>
             <div className={quickIconClass}><BookOpenText size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{language === "en" ? "Host guide" : "Príručka hostiteľa"}</span>
-            <span className="text-[13px] text-neutral-500 font-medium">{language === "en" ? "Tips for a strong listing" : "Tipy pre kvalitnú ponuku"}</span>
+            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Host guide" : "Príručka hostiteľa"}</span>
+            <span className="text-[13px] text-neutral-500 font-medium">{en ? "Tips for a strong listing" : "Tipy pre kvalitnú ponuku"}</span>
           </Link>
         </div>
       </div>

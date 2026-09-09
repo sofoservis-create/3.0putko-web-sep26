@@ -4,4 +4,4 @@
 - [Putko guest data ownership](putko-guest-data-ownership.md) — guest favorites and stays require authenticated current-user APIs; never trust browser-supplied ownership.
 - [Putko legacy backend isolation](putko-legacy-backend-isolation.md) — patch the Render backend from an isolated origin/main worktree, never from the migrated app branch.
 - [Putko rebuild data platform](putko-rebuild-data-platform.md) — target external PostgreSQL/PostGIS while preserving legacy accommodation contracts through adapters.
-- [Putko Host rebuild phases](putko-host-rebuild.md) — plan file location, Phases 0–1 done, URL-driven Host nav rules; no placeholder destinations in primary nav.
+- [Putko Host rebuild rules](putko-host-rebuild.md) — plan file location; URL-driven nav, single listings store, editor session guards, `lastVisitedStep` in payload.
