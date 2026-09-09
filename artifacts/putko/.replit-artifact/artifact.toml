@@ -12,7 +12,7 @@ paths = [ "/" ]
 localPort = 21864
 
 [services.development]
-run = "pnpm --filter @workspace/putko run dev"
+run = "NEXT_TELEMETRY_DISABLED=1 pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p $PORT"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/putko", "run", "build" ]
