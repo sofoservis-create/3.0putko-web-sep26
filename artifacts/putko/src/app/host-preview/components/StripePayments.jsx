@@ -49,8 +49,8 @@ export default function StripePayments({ onMenuClick }) {
         <Info size={20} className="shrink-0 mt-0.5 text-[#D9774B]" />
         <p className="text-sm leading-relaxed">
           {language === "en" 
-            ? "In the accommodation editor, go to Step 8 (Calendar & Payouts) to acknowledge payout terms." 
-            : "V editore ubytovania prejdite na Krok 8 (Kalendár a výplaty) pre potvrdenie podmienok výplat."}
+            ? "In the accommodation editor, go to Step 9 (Payout Account) to assign a Stripe payout account to the property."
+            : "V editore ubytovania prejdite na Krok 9 (Výplatný účet), kde priradíte Stripe účet k ubytovaniu."}
         </p>
       </div>
     </div>

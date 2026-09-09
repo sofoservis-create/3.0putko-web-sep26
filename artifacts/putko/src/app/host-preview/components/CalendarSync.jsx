@@ -49,8 +49,8 @@ export default function CalendarSync({ onMenuClick }) {
         <Info size={20} className="shrink-0 mt-0.5 text-[#238869]" />
         <p className="text-sm leading-relaxed">
           {language === "en" 
-            ? "In the accommodation editor, go to Step 8 (Calendar & Payouts) to connect your calendar feeds." 
-            : "V editore ubytovania prejdite na Krok 8 (Kalendár a výplaty), kde môžete pripojiť kanály kalendára."}
+            ? "In the accommodation editor, go to Step 8 (Calendar) to connect your calendar feeds."
+            : "V editore ubytovania prejdite na Krok 8 (Kalendár), kde môžete pripojiť kanály kalendára."}
         </p>
       </div>
     </div>

@@ -8,6 +8,7 @@ import {
   Wifi, 
   Image as ImageIcon, 
   CreditCard, 
+  Landmark,
   Calendar as CalendarIcon, 
   CheckCircle2, 
   AlertCircle, 
@@ -32,7 +33,8 @@ const STEPS = [
   { id: "photos", icon: ImageIcon, title: { en: "Photos", sk: "Fotografie" } },
   { id: "pricing", icon: CreditCard, title: { en: "Pricing", sk: "Ceny" } },
   { id: "availability", icon: CalendarIcon, title: { en: "Policies", sk: "Pravidlá" } },
-  { id: "readiness", icon: CheckCircle2, title: { en: "Calendar & Payouts", sk: "Kalendár a výplaty" } }
+  { id: "calendar", icon: CalendarIcon, title: { en: "Calendar", sk: "Kalendár" } },
+  { id: "readiness", icon: Landmark, title: { en: "Payout Account", sk: "Výplatný účet" } }
 ];
 
 const AMENITIES_LIST = [
@@ -237,7 +239,10 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
           <div className="flex flex-col gap-1.5">
             {STEPS.map((s, idx) => {
               const isActive = currentStep === idx;
-              const isComplete = completion.completedSteps?.includes(s.id);
+              const isComplete =
+                s.id === "calendar"
+                  ? Boolean(data.calendarChoice)
+                  : completion.completedSteps?.includes(s.id);
               return (
                 <button
                   key={s.id}
@@ -485,16 +490,68 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
                     </button>
                   </div>
                 )}
-                
-                <div className="pt-6 border-t border-neutral-100">
-                  <label className="flex items-start gap-4 p-5 rounded-2xl border-2 border-neutral-200 cursor-pointer hover:border-neutral-300 transition-colors bg-neutral-50/50">
-                    <input type="checkbox" name="payoutAcknowledged" checked={data.payoutAcknowledged || false} onChange={handleChange} className="w-5 h-5 mt-0.5 text-[#DFBA73] border-neutral-300 rounded focus:ring-[#DFBA73]" />
-                    <div className="flex-1">
-                      <span className="block text-sm font-bold text-[#1E3E2B]">{language === "en" ? "I acknowledge the payout terms and Stripe setup" : "Beriem na vedomie podmienky výplaty a nastavenie Stripe"}</span>
-                      <span className="block text-[13px] font-medium text-neutral-500 mt-1">{language === "en" ? "Your financial accounts will be securely linked upon going live." : "Vaše finančné účty budú bezpečne prepojené po spustení."}</span>
+              </div>
+            )}
+
+            {currentStep === 8 && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-neutral-200 bg-neutral-50/70 p-6 sm:p-8">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E3E2B] text-white">
+                      <Landmark size={26} />
                     </div>
-                  </label>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-lg font-bold text-[#1E3E2B]">
+                          {language === "en" ? "Stripe payout account" : "Výplatný účet Stripe"}
+                        </h3>
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                          {language === "en" ? "Not connected" : "Nepripojený"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium leading-relaxed text-neutral-500">
+                        {language === "en"
+                          ? "Connect the host's verified Stripe account to this property. Booking payouts for this listing will be sent to that account."
+                          : "Pripojte overený Stripe účet hostiteľa k tomuto ubytovaniu. Výplaty z rezervácií tejto ponuky budú smerovať na tento účet."}
+                      </p>
+                      <button
+                        type="button"
+                        disabled
+                        className="mt-5 inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-neutral-200 px-5 py-3 text-sm font-bold text-neutral-500"
+                      >
+                        <CreditCard size={18} />
+                        {language === "en" ? "Connect Stripe account" : "Pripojiť Stripe účet"}
+                      </button>
+                      <p className="mt-2 text-xs font-medium text-neutral-400">
+                        {language === "en"
+                          ? "The connection button will become available when Stripe Connect is enabled."
+                          : "Tlačidlo bude dostupné po aktivovaní Stripe Connect."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                <label className="flex cursor-pointer items-start gap-4 rounded-2xl border-2 border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300">
+                  <input
+                    type="checkbox"
+                    name="payoutAcknowledged"
+                    checked={data.payoutAcknowledged || false}
+                    onChange={handleChange}
+                    className="mt-0.5 h-5 w-5 rounded border-neutral-300 text-[#DFBA73] focus:ring-[#DFBA73]"
+                  />
+                  <div className="flex-1">
+                    <span className="block text-sm font-bold text-[#1E3E2B]">
+                      {language === "en"
+                        ? "I acknowledge the payout terms for this property"
+                        : "Beriem na vedomie podmienky výplat pre toto ubytovanie"}
+                    </span>
+                    <span className="mt-1 block text-[13px] font-medium text-neutral-500">
+                      {language === "en"
+                        ? "You can save the listing now. A connected and verified Stripe account will be required before accepting paid bookings."
+                        : "Ponuku môžete teraz uložiť. Pred prijímaním platených rezervácií bude potrebný pripojený a overený Stripe účet."}
+                    </span>
+                  </div>
+                </label>
               </div>
             )}
           </div>
