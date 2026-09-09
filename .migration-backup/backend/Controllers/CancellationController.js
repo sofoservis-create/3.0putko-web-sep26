@@ -2,7 +2,6 @@
 import mongoose from "mongoose";
 import Reservation from "../models/Reservation.js";
 import Accommodation from "../models/Accommodation.js";
-import Host from "../models/Host.js";
 import {
   calculateRefundCents,
   describeTiers,
@@ -48,14 +47,9 @@ export const previewCancellation = async (req, res) => {
       });
     }
 
-    // Mirrors cancelBooking: a host cancellation refunds the guest in full,
-    // everyone else follows the snapshotted policy. If these two ever disagree,
-    // the dialog shows one number and the button does another.
-    const fullRefund = actor === "host";
-    const refundAmountCents = isPaid
-      ? (fullRefund ? reservation.grossCents() : outcome.refundCents)
-      : 0;
-    const refundPercent = isPaid ? (fullRefund ? 100 : outcome.refundPercent) : 0;
+    // The policy applies to everyone, including the host. Mirrors cancelBooking.
+    const refundAmountCents = isPaid ? outcome.refundCents : 0;
+    const refundPercent = isPaid ? outcome.refundPercent : 0;
 
     res.json({
       cancellable: reservation.isApproved !== "cancelled" && !reservation.transferId,
@@ -133,20 +127,17 @@ export const cancelBooking = async (reservation, cancelledBy, options = {}) => {
   let refundCents = 0;
 
   if (reservation.paymentStatus === "paid") {
+    // The listing's cancellation policy applies to every cancellation, whoever
+    // makes it — a host cancelling refunds the same amount the guest would have
+    // received cancelling at that moment, not automatically the full price.
+    //
+    // Note this differs from spec §7 ("host cancellation = full refund") and from
+    // the Booking/Airbnb convention, by explicit product decision on 2026-08-04.
+    // The consequence to keep in mind: a host who cancels close to check-in
+    // leaves the guest with neither the stay nor their money, so an admin
+    // override is the only route to a goodwill refund in that case.
     if (cancelledBy === "admin" && overrideRefundCents != null) {
       refundCents = Math.max(0, Math.min(Math.round(overrideRefundCents), reservation.grossCents()));
-    } else if (cancelledBy === "host") {
-      // A HOST cancellation is a full refund, always.
-      //
-      // The cancellation policy is a bargain the GUEST accepted about the guest
-      // changing their mind. It has nothing to say about the host withdrawing a
-      // stay the guest already paid for. Applying the guest's tier here — which
-      // is what this used to do, by a product decision recorded on 2026-08-04 —
-      // means a host who cancels the week before arrival keeps the guest's money
-      // AND the guest has nowhere to sleep. That is not a defensible position
-      // for an intermediary under Slovak consumer law (§ 3 zákona č. 250/2007
-      // Z. z.), and it is the opposite of what every comparable platform does.
-      refundCents = reservation.grossCents();
     } else {
       const outcome = calculateRefundCents(reservation);
       if (!outcome) {
@@ -225,64 +216,8 @@ export const cancelBooking = async (reservation, cancelledBy, options = {}) => {
 
   await sendCancellationEmails(reservation, cancelledBy, refundCents);
 
-  // Three host cancellations in a rolling twelve months deactivates the account.
-  if (cancelledBy === "host") await enforceHostCancellationLimit(reservation);
-
   return { ok: true, refundCents, refundId: reservation.refundId };
 };
-
-/** How many host cancellations in twelve months cost the account. */
-const HOST_CANCELLATION_LIMIT = Number(process.env.HOST_CANCELLATION_LIMIT || 3);
-
-/**
- * Deactivate a host who keeps cancelling on guests.
- *
- * Nothing counted these before, so the rule existed on paper only. A host could
- * cancel every booking they disliked the look of, indefinitely, and the platform
- * kept sending them guests.
- *
- * Deactivation is recorded on the host and their listings are taken out of the
- * catalogue; it is not a deletion, and an admin can reverse it.
- */
-async function enforceHostCancellationLimit(reservation) {
-  try {
-    const hostId = reservation.accommodationProvider;
-    if (!hostId) return;
-
-    const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const count = await Reservation.countDocuments({
-      accommodationProvider: hostId,
-      cancelledBy: "host",
-      cancelledAt: { $gte: since },
-      // A request the host declined was never a confirmed booking, so it is not
-      // a cancellation in the sense this rule is about.
-      paymentStatus: { $in: ["refunded", "partially_refunded", "paid"] },
-    });
-
-    if (count < HOST_CANCELLATION_LIMIT) return;
-
-    const host = await Host.findById(hostId);
-    if (!host || host.deactivatedAt) return;
-
-    host.deactivatedAt = new Date();
-    host.deactivationReason = `${count} host cancellations in 12 months`;
-    await host.save();
-
-    await Accommodation.updateMany(
-      { userId: hostId },
-      { $set: { stripeEnabled: false, listingStatusUpdatedAt: new Date() } }
-    );
-
-    await alertAdmin("Host deactivated for repeated cancellations", {
-      hostId: String(hostId),
-      cancellations: count,
-      windowDays: 365,
-    });
-  } catch (err) {
-    // Never let the counter break the cancellation the guest is waiting on.
-    console.error("enforceHostCancellationLimit failed:", err.message);
-  }
-}
 
 /**
  * POST /api/cancellation/:reservationId

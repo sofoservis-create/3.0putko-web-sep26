@@ -15,7 +15,7 @@ import {
 import { sendEvent } from "../utils/FacebookCAPI.js";
 import { getTiersSnapshot, getPolicyNameSnapshot } from "../utils/cancellationPolicy.js";
 import { calculateFees, DEFAULT_CURRENCY, PAYOUT_DELAY_HOURS } from "../config/payments.js";
-import { quoteStay, priceMismatch, nightsBetween } from "../utils/pricing.js";
+import { quoteStay, priceMismatch } from "../utils/pricing.js";
 import { calendarDateUtc, businessMidnightUtc } from "../utils/timezone.js";
 import Host from "../models/Host.js";
 import { isHostBookingReady } from "../utils/listingGating.js";
@@ -100,41 +100,6 @@ export const createReservation = async (req, res) => {
       return res.status(400).json({ error: "Valid check-in and check-out dates are required" });
     }
 
-    // Guests must be 18. Nothing in this system asked, anywhere: not at
-    // registration, not at checkout, not here. A minor was able to enter a
-    // binding accommodation contract with a host, which under § 9 Občianskeho
-    // zákonníka they cannot validly do — leaving the host with an unenforceable
-    // booking and Putko having taken the money for it.
-    //
-    // A self-declared date of birth is the weakest form of this check, and it is
-    // what a booking flow can reasonably ask for; it establishes that the guest
-    // asserted they were of age, which is the point.
-    const dob = req.body?.dateOfBirth;
-    if (dob) {
-      const born = calendarDateUtc(dob);
-      const eighteenth = born && new Date(born);
-      if (eighteenth) eighteenth.setUTCFullYear(eighteenth.getUTCFullYear() + 18);
-
-      if (!eighteenth || eighteenth > new Date()) {
-        return res.status(400).json({
-          error: "Guests must be at least 18 years old to book",
-          code: "under_age",
-        });
-      }
-      reservation.guestDateOfBirth = born;
-    } else if (String(process.env.REQUIRE_GUEST_AGE_CONFIRMATION || "true") === "true") {
-      // No date of birth supplied: fall back to an explicit confirmation, so the
-      // guest has at least been asked. Turn the flag off only while the booking
-      // form is being updated to collect it.
-      if (req.body?.confirmedAdult !== true) {
-        return res.status(400).json({
-          error: "Please confirm you are at least 18 years old",
-          code: "age_confirmation_required",
-        });
-      }
-      reservation.guestConfirmedAdultAt = new Date();
-    }
-
     // Freeze the cancellation terms and the money figures at booking time.
     // The guest is agreeing to THESE terms; a later edit to the listing (or to
     // the standard policy definitions) must not change this booking.
@@ -142,89 +107,26 @@ export const createReservation = async (req, res) => {
     // the request-to-book email can describe the account THIS listing pays into.
     // Without it every multi-account host would be told about their default.
     const listing = await Accommodation.findById(reservation.accommodationId).select(
-      "name cancellationPolicyType customPolicyTiers pricePerNight pricePerPerson flexiblePrices petFeePerNight payoutStripeAccountId person nightMin nightMax"
+      "name cancellationPolicyType customPolicyTiers pricePerNight pricePerPerson flexiblePrices petFeePerNight payoutStripeAccountId"
     );
     if (!listing) {
       return res.status(404).json({ error: "Accommodation not found" });
     }
 
-    // WHO the booking belongs to comes from the listing, not from the request.
-    //
-    // `accommodationProvider` arrived in the body and was stored as-is. A crafted
-    // booking naming someone else's host id had that host emailed the guest's
-    // name, email address, dates and price — a PII disclosure to an attacker's
-    // own host account — and left the booking permanently unpayable, because
-    // resolveHostForReservation refuses when the provider and the listing owner
-    // disagree.
-    const listingOwner = await Accommodation.findById(reservation.accommodationId).select("userId");
-    if (listingOwner?.userId) {
-      reservation.accommodationProvider = listingOwner.userId;
-    }
-
     reservation.cancellationPolicySnapshot = getPolicyNameSnapshot(listing);
     reservation.cancellationTiersSnapshot = getTiersSnapshot(listing);
 
-    // --- Party size ---
-    //
-    // The price was computed from `guests.adults` / `guests.children` in the
-    // body while `numberOfPersons` — the count the booking is actually made for,
-    // and the one the host is shown — came from a different body field that was
-    // never reconciled with it. On a listing priced per person, posting
-    // `numberOfPersons: 8` with `guests: { adults: 1 }` produced a confirmed
-    // eight-person booking charged for one. The client picks the number of
-    // guests; it does not get to pick the number the price is computed from.
-    const requestedAdults = Number(req.body?.guests?.adults ?? req.body?.adults ?? 0);
-    const requestedChildren = Number(req.body?.guests?.children ?? req.body?.children ?? 0);
-    const requestedInfants = Number(req.body?.guests?.infants ?? req.body?.infants ?? 0);
-
-    const declaredParty = requestedAdults + requestedChildren + requestedInfants;
-    // Whichever count is HIGHER is the one the stay is priced and validated on,
-    // so neither field can be used to understate the party.
-    const partySize = Math.max(declaredParty, Number(reservation.numberOfPersons) || 0);
-    if (partySize < 1) {
-      return res.status(400).json({ error: "At least one guest is required" });
-    }
-    reservation.numberOfPersons = partySize;
-
-    // Occupancy. Nothing checked this, so a listing sleeping 4 could be booked
-    // for 12 — and on a per-person listing the guest was charged for 12 while
-    // the host discovered the problem on arrival day.
-    if (listing.person && partySize > listing.person) {
-      return res.status(400).json({
-        error: `This property sleeps ${listing.person}`,
-        code: "over_capacity",
-      });
-    }
-
-    // Minimum / maximum stay. Enforced only in the browser until now, so a
-    // direct POST ignored both.
-    const nights = nightsBetween(reservation.checkInDate, reservation.checkOutDate);
-    if (listing.nightMin && nights < listing.nightMin) {
-      return res.status(400).json({
-        error: `Minimum stay is ${listing.nightMin} night(s)`,
-        code: "below_min_nights",
-      });
-    }
-    if (listing.nightMax && nights > listing.nightMax) {
-      return res.status(400).json({
-        error: `Maximum stay is ${listing.nightMax} night(s)`,
-        code: "above_max_nights",
-      });
-    }
-
     // --- Authoritative price, computed from the listing ---
-    //
-    // Infants are excluded from the per-person rate (matching the checkout
-    // page), but they still count towards occupancy above.
-    const payingAdults = Math.max(
-      1,
-      partySize - requestedInfants > 0 ? partySize - requestedInfants : partySize
-    );
     const quote = quoteStay(listing, {
       checkInDate: reservation.checkInDate,
       checkOutDate: reservation.checkOutDate,
-      adults: payingAdults,
-      children: 0,
+      adults: req.body?.guests?.adults ?? req.body?.adults,
+      children: req.body?.guests?.children ?? req.body?.children,
+      // numberOfPersons is the only guest count the schema stores, so fall back
+      // to it when the request did not break the party down by age.
+      ...(req.body?.guests || req.body?.adults != null
+        ? {}
+        : { adults: reservation.numberOfPersons }),
     });
 
     if (!quote.ok) {
@@ -466,20 +368,11 @@ export const getReservationById = async (req, res) => {
 export const updateReservationByName = async (req, res) => {
   try {
     const { name } = req.params; // Extract reservation name from URL parameters
-    // Same allowlist as updateReservation — this route reached the same document
-    // with the same unrestricted body.
-    const updates = Object.fromEntries(
-      Object.entries(req.body || {}).filter(([key]) => RESERVATION_UPDATABLE_FIELDS.has(key))
-    );
+    const updates = req.body; // Reservation updates from the request body
 
-    // The path segment was interpolated straight into a regular expression, so
-    // `/name/.*` matched every booking and updated whichever came back first,
-    // and a crafted pattern is a CPU-exhaustion primitive. Escaped and anchored.
-    const nameLiteral = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // Find the reservation by name (case-insensitive exact match) and update it
+    // Find the reservation by name (case-insensitive search) and update it
     const updatedReservation = await Reservation.findOneAndUpdate(
-      { name: { $regex: `^${nameLiteral}$`, $options: 'i' } },
+      { name: { $regex: name, $options: 'i' } }, // Case-insensitive search by name
       { $set: updates }, // Apply updates to the fields
       { new: true, runValidators: true } // Return the updated document and run validators
     )
@@ -516,13 +409,9 @@ export const getReservationByName = async (req, res) => {
   try {
     const { name } = req.params;
 
-    // Escaped and anchored: unescaped, `/name/.*` returned the whole collection
-    // and a crafted pattern burned CPU on every document.
-    const nameLiteral = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // Find reservations where the name matches (case-insensitive exact match)
+    // Find reservations where the name matches (case-insensitive search)
     const reservations = await Reservation.find({
-      name: { $regex: `^${nameLiteral}$`, $options: 'i' }
+      name: { $regex: name, $options: 'i' } // Case-insensitive search
     })
     .populate('accommodationId') // Populate accommodationId as needed
     .select('-userId'); // Exclude userId field from results
@@ -545,14 +434,6 @@ export const getReservationByAccommodationProvider = async (req, res) => {
     // Validate if the provided providerId is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(providerId)) {
       return res.status(400).json({ message: 'Invalid accommodation provider ID' });
-    }
-
-    // A session is not authorisation. Without this, any signed-in account could
-    // read every booking of any host by putting their id in the path — guest
-    // names, emails, phone numbers, amounts and payout state.
-    const callerId = String(req.userId || "");
-    if (callerId !== String(providerId) && req.role !== "admin" && req.role !== "superadmin") {
-      return res.status(403).json({ message: "Not your bookings" });
     }
 
     // Find reservations that match the accommodation provider ID
@@ -603,12 +484,6 @@ export const getReservationsByUserId = async (req, res) => {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    // Same rule as the provider route above: the caller may only read their own.
-    const callerId = String(req.userId || "");
-    if (callerId !== String(userId) && req.role !== "admin" && req.role !== "superadmin") {
-      return res.status(403).json({ message: "Not your bookings" });
-    }
-
     // Find reservations that match the user ID.
     // Same StrictPopulateError as getReservationById above: `userId` is not on
     // the schema, so populating it threw and this endpoint answered 500 rather
@@ -650,33 +525,9 @@ export const deleteReservationsByUserId = async (req, res) => {
 
 
 // Update Reservation Controller
-// Fields a caller may set on an existing booking.
-//
-// `findByIdAndUpdate(id, req.body)` applied WHATEVER arrived. Every money field
-// is on this schema, so a request could set `paymentStatus: "paid"` on an unpaid
-// booking, rewrite `hostAmountCents` and `totalPriceCents`, clear `transferId`
-// to make an already-paid-out booking eligible for a second transfer, or set
-// `totalPriceCents: 0` and then approve it as a free stay — which blocks the
-// calendar and mails a confirmation without a cent changing hands.
-//
-// Amounts, payment state, payout state and the policy snapshot are all set by
-// the server from the listing and from Stripe, and are never accepted here.
-const RESERVATION_UPDATABLE_FIELDS = new Set([
-  "name",
-  "username",
-  "phone",
-  "message",
-  "language",
-  "numberOfPersons",
-  "isApproved",
-  "cancellationReason",
-]);
-
 export const updateReservation = async (req, res) => {
   const { id } = req.params; // Reservation ID from the URL
-  const updateData = Object.fromEntries(
-    Object.entries(req.body || {}).filter(([key]) => RESERVATION_UPDATABLE_FIELDS.has(key))
-  );
+  const updateData = req.body; // Data to update from the request body
   const { language } = req.body; // Extract language if provided
 
   try {

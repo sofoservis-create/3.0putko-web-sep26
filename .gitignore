@@ -47,9 +47,3 @@ Thumbs.db
 # Replit
 .cache/
 .local/
-
-# Environment files — never commit real credentials. There was no rule for
-# this at all; utils/redis.js:5 is what happens without one.
-.env
-.env.*
-!.env.example

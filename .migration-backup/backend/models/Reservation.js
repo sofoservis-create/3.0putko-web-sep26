@@ -138,15 +138,6 @@ const reservationSchema = new mongoose.Schema({
     default: "unpaid"
   },
   paymentIntentId: { type: String },
-  // The Stripe charge behind the PaymentIntent.
-  //
-  // PaymentController.applyPaidCheckoutSession WRITES this on every settled
-  // booking, but it was never declared here — so Mongoose's strict mode silently
-  // discarded it on every save. The dispute handler then looks bookings up by
-  // `{ chargeId: dispute.charge }`, a field that is therefore never present, and
-  // `charge.dispute.created` could not be matched to a booking through that
-  // branch at all.
-  chargeId: { type: String, index: true },
   checkoutSessionId: { type: String },
   totalPriceCents: { type: Number },      // store cents
   // How the total was arrived at, recorded at booking time. The amount is
@@ -169,13 +160,6 @@ const reservationSchema = new mongoose.Schema({
   },
   transferId: { type: String }, // store Stripe transfer ID
   language: { type: String, default: "sk" }, // User's preferred language
-
-  // --- Guest age ---
-  // Guests must be 18 (§ 9 Občianskeho zákonníka: a minor cannot validly enter
-  // this contract). Nothing recorded or checked this before. One of the two is
-  // set at booking time — see createReservation.
-  guestDateOfBirth: { type: Date },
-  guestConfirmedAdultAt: { type: Date },
 
   // --- Cancellation policy snapshot ---
   // Copied from the listing when the booking is created, and never re-read from

@@ -8,34 +8,6 @@
       "when": 1788821806341,
       "tag": "0000_zippy_eternals",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1788940643217,
-      "tag": "0001_marketplace_core",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788940661079,
-      "tag": "0002_geography_and_exclusion",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1788944082242,
-      "tag": "0003_destinations",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788944116866,
-      "tag": "0004_destination_centre",
-      "breakpoints": true
     }
   ]
 }

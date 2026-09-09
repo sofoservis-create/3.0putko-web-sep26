@@ -13,22 +13,6 @@ import {
 import Host from "../models/Host.js";
 import LoginHistory from "../models/LoginHistory.js";
 
-/**
- * Look an account up by email, case-insensitively, WITHOUT building a regular
- * expression out of it.
- *
- * `new RegExp(`^${email}$`, "i")` compiled attacker input as a pattern. `.*`
- * matched the first account in the collection; `(a+)+$` is catastrophic
- * backtracking evaluated against every document, which is a single-request
- * denial of service. Mongo's case-insensitive collation does the same job with
- * no pattern involved, and unlike a regex it can use the email index.
- */
-const findByEmail = (Model, email) =>
-  Model.findOne({ email: String(email || "").trim() }).collation({
-    locale: "en",
-    strength: 2,
-  });
-
 const generateToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET_KEY, {
     expiresIn: "30d",
@@ -62,7 +46,7 @@ export const register = async (req, res) => {
     if (role === "guest") {
       existingUser = await User.findOne({ email });
     } else if (role === "host") {
-      existingUser = await findByEmail(Host, email);
+      existingUser = await Host.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
     }
 
     if (existingUser) {
@@ -161,48 +145,40 @@ export const login = async (req, res) => {
   try {
     let user = null;
 
-    const guest = await findByEmail(User, email);
-    const host = await findByEmail(Host, email);
+    const guest = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
+    const host = await Host.findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
-    // The whole Mongoose document used to be printed here — email, phone,
-    // address, date of birth and the bcrypt password HASH — into Render's log
-    // stream, where it is retained and readable by anyone with dashboard access.
-    // Nothing about a login needs to be logged beyond whether it succeeded.
+    console.log('Guest found:', guest);
+    console.log('Host found:', host);
+
     if (guest) user = guest;
     if (host) user = host;
 
-    // A missing account and a wrong password answer identically. Answering 404
-    // for one and 400 for the other turns this endpoint into an oracle for
-    // "does this person have a Putko account", which is worth money to whoever
-    // is compiling the list.
-    if (!user || !user.password) {
-      return res.status(400).json({ status: false, message: t.invalidCredentials });
+    // Check if user exists
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({ message: t.userNotFound });
+    }
+
+    // Ensure the user is verified
+    if (!user.isVerified) {
+      console.log('User not verified');
+      return res.status(400).json({ message: t.verifyEmail });
     }
 
     // Compare password
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
+      console.log('Password does not match');
       return res.status(400).json({ status: false, message: t.invalidCredentials });
     }
 
-    // Ensure the user is verified. Checked AFTER the password, so an unverified
-    // account is not disclosed to someone who cannot sign in as them anyway.
-    if (!user.isVerified) {
-      return res.status(400).json({ message: t.verifyEmail });
-    }
-
-    // Save login history separately.
-    //
-    // `host._id` was read unconditionally, so a GUEST login threw TypeError here
-    // and was caught below as "Failed to login" — every guest sign-in failed
-    // after a correct password.
-    if (host) {
-      await LoginHistory.create({
-        hostId: host._id,
-        ip: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
-    }
+    // Save login history separately
+    await LoginHistory.create({
+      hostId: host._id,
+      ip: req.ip,
+      userAgent: req.get("User-Agent"),
+    });
 
     // Generate authentication token
     const token = generateToken(user);
@@ -229,8 +205,8 @@ export const requestPasswordReset = async (req, res) => {
   try {
     let user = null;
 
-    const guest = await findByEmail(User, email);
-    const host = await findByEmail(Host, email);
+    const guest = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+    const host = await Host.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
 
     if (guest) {
       user = guest;
@@ -239,10 +215,9 @@ export const requestPasswordReset = async (req, res) => {
       user = host;
     }
 
-    // Always the same answer, whether or not the address is on file — a 404 here
-    // told anyone who asked which email addresses have Putko accounts.
+    //check if user exist or not
     if (!user) {
-      return res.status(200).json({ message: 'Password reset link sent to your email' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     const resetToken = generateToken(user);
@@ -318,37 +293,16 @@ export const resetPassword = async (req, res) => {
 };
 
 export const changePassword = async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-
-  // The account is taken from the VERIFIED token, never from the body.
-  // `userId` used to be read straight off the request with no authentication at
-  // all, so anyone who knew an id — and every host id is published on their own
-  // listings — could set that account's password and sign in as them.
-  const callerId = req.auth?.id;
-  if (!callerId) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-
-  if (typeof newPassword !== "string" || newPassword.length < 8) {
-    return res.status(400).json({ message: "New password must be at least 8 characters" });
-  }
+  const { userId, newPassword, role } = req.body;
 
   try {
-    // Which collection the caller belongs to is decided by the token's kind,
-    // not by a `role` string in the body that the caller chooses.
-    const user =
-      req.auth.kind === "host"
-        ? await Host.findById(callerId)
-        : await User.findById(callerId);
+    // Find user based on role
+    const user = role === "guest" 
+      ? await User.findById(userId) 
+      : await Host.findById(userId);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
-    }
-
-    // Knowing the current password is what proves this is the account holder and
-    // not a stolen or leaked token.
-    if (!user.password || !(await bcrypt.compare(String(currentPassword || ""), user.password))) {
-      return res.status(400).json({ message: "Current password is incorrect" });
     }
 
     // Hash the new password
@@ -369,11 +323,13 @@ export const verifyEmail = async (req, res) => {
   try {
      // Verify the JWT token
      const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
+     console.log("Decoded ID:", decoded.id); // Log the decoded ID for debugging
+ 
      // Retrieve user based on role
      const user = role === "guest"
        ? await User.findById(decoded.id)
        : await Host.findById(decoded.id);
+       console.log("Role:", role);
  
      // Check if user exists
      if (!user) {

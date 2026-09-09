@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import crypto from 'crypto';
 import { validateCustomTiers } from '../utils/cancellationPolicy.js';
 
 const accommodationSchema = new mongoose.Schema({
@@ -251,20 +250,6 @@ const accommodationSchema = new mongoose.Schema({
    * Generated after draft autosave / first feed add.
    */
   icalExportUrl: { type: String },
-  /**
-   * Secret for the outbound feed.
-   *
-   * The export used to be served at /api/accommodation/<listing id>/calendar.ics
-   * with no credential at all, and a Mongo ObjectId is a timestamp plus a
-   * counter — enumerable, and published on every listing page besides. Anyone
-   * could pull any property's occupancy, and the events carried the GUEST'S
-   * NAME. This is what the URL is keyed on instead.
-   */
-  icalExportToken: {
-    type: String,
-    select: false,
-    index: true,
-  },
 
   locationDetails: {
     streetAndNumber: {
@@ -566,17 +551,6 @@ const accommodationSchema = new mongoose.Schema({
       calendarSyncId: {
         type: mongoose.Schema.Types.ObjectId,
         required: false,
-      },
-      // The upstream event's RFC 5545 UID, for rows imported from a feed.
-      //
-      // Without it the importer could not tell an event that MOVED from one that
-      // was ADDED, and could not tell a deleted event from one it had simply not
-      // seen — so imported blocks accumulated and were never released. See
-      // syncBookings in Controllers/AccommodationController.js.
-      icsUid: {
-        type: String,
-        required: false,
-        index: true,
       },
     }
   ],

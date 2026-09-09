@@ -1248,37 +1248,6 @@ export const resolveHostForReservation = async (reservation) => {
  */
 const STRIPE_STATUS_MAX_AGE_MS = 5 * 60 * 1000;
 
-/** How many completed stays a host needs before payouts release at check-in. */
-export const PAYOUT_EARLY_MIN_COMPLETED_BOOKINGS = Number(
-  process.env.PAYOUT_EARLY_MIN_COMPLETED_BOOKINGS || 3
-);
-
-/**
- * Has this booking's host completed enough stays to be paid at check-in rather
- * than at check-out?
- *
- * Counts only stays that actually happened and were not unwound: paid, not
- * cancelled, no refund, and past check-out. Bookings that are merely taken say
- * nothing about whether the host delivers.
- *
- * Excludes THIS booking, which by definition has not completed.
- */
-async function hostQualifiesForEarlyPayout(reservation) {
-  const hostId = reservation.accommodationProvider;
-  if (!hostId) return false;
-
-  const completed = await Reservation.countDocuments({
-    _id: { $ne: reservation._id },
-    accommodationProvider: hostId,
-    paymentStatus: "paid",
-    isApproved: { $ne: "cancelled" },
-    checkOutDate: { $lt: new Date() },
-    $or: [{ refundAmountCents: { $lte: 0 } }, { refundAmountCents: { $exists: false } }],
-  }).limit(PAYOUT_EARLY_MIN_COMPLETED_BOOKINGS);
-
-  return completed >= PAYOUT_EARLY_MIN_COMPLETED_BOOKINGS;
-}
-
 /**
  * Core payout. Shared by the manual endpoint and the daily sweep so both apply
  * exactly the same eligibility rules.
@@ -1301,40 +1270,16 @@ export const payoutReservation = async (reservation, { force = false, requireBil
     return { ok: false, code: "refunded", error: "Reservation has been refunded" };
   }
 
-  // Hold window.
-  //
-  // The rule is NOT a flat check-in + 24 h for everybody, which is what this
-  // used to do. An established host is paid early because their track record
-  // makes a mid-stay dispute unlikely; a host without one is paid after the
-  // guest has actually left and had the chance to complain.
-  //
-  //   established host  ->  check-in  + PAYOUT_DELAY_HOURS
-  //   everyone else     ->  check-out + PAYOUT_DELAY_HOURS
-  //
-  // "Established" is PAYOUT_EARLY_MIN_COMPLETED_BOOKINGS or more bookings that
-  // are paid, not cancelled, not refunded, and whose check-out has passed —
-  // completed stays, not bookings taken.
-  //
-  // The third condition in the business rule, "no open complaint", is NOT
-  // enforced here: there is no complaint record anywhere in this system to read.
-  // See audit/DECISIONS-NEEDED.md — until a complaint exists as data, an open
-  // complaint cannot hold a payout, and money will keep going out on disputed
-  // stays.
+  // Hold window: PAYOUT_DELAY_HOURS after check-in, measured in the business
+  // timezone. Previously the backend released from check-in 00:00 while the UI
+  // implied check-in + 24 h, so the backend was the more permissive of the two.
   if (!force) {
-    const earlyRelease = await hostQualifiesForEarlyPayout(reservation);
-    const anchor = earlyRelease ? reservation.checkInDate : reservation.checkOutDate;
-    const elapsed = earlyRelease
-      ? hoursSinceCheckIn(anchor)
-      : hoursSinceCheckIn(anchor); // same helper: hours since that calendar date's local midnight
-
+    const elapsed = hoursSinceCheckIn(reservation.checkInDate);
     if (elapsed < PAYOUT_DELAY_HOURS) {
       return {
         ok: false,
         code: "locked",
-        error:
-          `Payout unlocks ${PAYOUT_DELAY_HOURS}h after ` +
-          `${earlyRelease ? "check-in" : "check-out"} ` +
-          `(${PAYOUT_DELAY_HOURS - elapsed}h remaining)`,
+        error: `Payout unlocks ${PAYOUT_DELAY_HOURS}h after check-in (${PAYOUT_DELAY_HOURS - elapsed}h remaining)`,
       };
     }
   }

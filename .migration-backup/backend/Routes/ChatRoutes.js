@@ -5,8 +5,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-import { requireAuth } from "../auth/authorize.js";
-
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -15,10 +13,7 @@ function detectLanguage(text) {
   return hasSlovakChars ? 'sk' : 'en';
 }
 
-// Unauthenticated, this endpoint spent Putko's OpenAI credit for anyone who
-// called it in a loop and relayed arbitrary caller text into a prompt. The
-// per-caller cap is mounted by path in index.js; this is the identity check.
-router.post("/chat", requireAuth, async (req, res) => {
+router.post("/chat", async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ error: "Query is required" });
 

@@ -74,14 +74,8 @@ export const getUserById = async (req, res) => {
     const { userId } = req.params;
   
     try {
-      // Fetch user by ID from the database.
-      //
-      // Explicitly projected — this route is UNAUTHENTICATED and used to return
-      // the whole document, including the bcrypt password hash and any live
-      // `resetPasswordToken`.
-      const user = await User.findById(userId).select(
-        "-password -resetPasswordToken -resetPasswordExpires"
-      );
+      // Fetch user by ID from the database
+      const user = await User.findById(userId);
   
       // If the user doesn't exist, return a 404
       if (!user) {

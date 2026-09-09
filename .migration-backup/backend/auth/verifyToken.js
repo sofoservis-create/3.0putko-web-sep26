@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import Host from "../models/Host.js";
 
 export const authenticate = async (req, res, next) => {
   // Get token from headers
@@ -30,28 +29,19 @@ export const authenticate = async (req, res, next) => {
 export const restrict = (roles) => async (req, res, next) => {
   const userId = req.userId;
 
-  // FAILS CLOSED.
-  //
-  // This only ever looked in the User collection, and then let the request
-  // through whenever it found nothing — `if (user && ...)` is false for a null
-  // user, so the deny branch was skipped entirely. A Host token, an Admin token,
-  // or a token for a deleted account all sailed past `restrict(['guest'])` and
-  // `restrict(['host'])` alike: the check was decorative for every caller who
-  // was not a guest.
-  //
-  // Hosts are a separate collection, so both are consulted, and a caller whose
-  // account cannot be found is refused rather than admitted.
-  const user =
-    (await User.findById(userId).select("role")) ||
-    (await Host.findById(userId).select("role"));
+  let user;
 
-  if (!user) {
-    return res.status(401).json({ success: false, message: "You're not authorized" });
+  const guest = await User.findById(userId);
+  
+
+  if (guest) {
+    user = guest;
   }
 
-  const role = String(user.role || "").trim().toLowerCase();
-  if (!roles.map((r) => String(r).toLowerCase()).includes(role)) {
-    return res.status(403).json({ success: false, message: "You're not authorized" });
+
+  // Check if user exists and has a truthy role property before accessing it
+  if (user && user.role && !roles.includes(user.role)) {
+    return res.status(401).json({ success: false, message: "You're not authorized" });
   }
 
   next();

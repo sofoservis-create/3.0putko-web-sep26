@@ -118,55 +118,7 @@ async function dropSupersededHolds(accommodation, reservation, now) {
 }
 
 /**
- * The MongoDB filter fragment matching "some ACTIVE calendar row overlaps this
- * range", expressed so the database evaluates it — not the application.
- *
- * Mirrors `isActive` and `occupiedDays` exactly: every row that is not a hold
- * occupies its dates, and a hold occupies its dates until it expires. Intervals
- * are compared with the same inclusive-end convention `dayKeys` uses, so this
- * predicate and the in-memory one cannot disagree.
- */
-function overlapFilter({ start, end, exceptReservationId, now }) {
-  const conditions = [
-    { startDate: { $lte: end } },
-    { endDate: { $gte: start } },
-    { $or: [{ status: { $ne: "held" } }, { status: "held", holdExpiresAt: { $gt: now } }] },
-  ];
-
-  if (exceptReservationId) {
-    conditions.push({
-      $or: [
-        { reservationId: { $exists: false } },
-        { reservationId: { $ne: exceptReservationId } },
-      ],
-    });
-  }
-
-  return { $elemMatch: { $and: conditions } };
-}
-
-/**
  * Try to hold a date range for a booking.
- *
- * ATOMICITY. This used to read the listing, decide in JavaScript that the dates
- * were free, and then save the document back. Between the read and the save
- * there is a window — a network round trip plus however long the event loop
- * takes — in which a second request can run the identical check against the
- * identical snapshot, also conclude the dates are free, and also save. Both
- * guests then hold the same nights, both are sent to Stripe, and both pay.
- *
- * There is no transaction here and no unique index that could catch it: the
- * calendar is an array embedded in the listing document, so the second save is
- * a last-write-wins overwrite of the whole array. MongoDB cannot express a
- * range-exclusion constraint the way Postgres can with
- * `EXCLUDE USING gist (... daterange ... WITH &&)`, so the guarantee has to come
- * from the update itself.
- *
- * A single `findOneAndUpdate` is atomic on one document. Putting the
- * no-overlap requirement in the FILTER means the database re-evaluates it at
- * write time under its own document lock: whichever writer arrives second no
- * longer matches, gets null back, and is told the dates are taken. That is what
- * makes "first one confirmed wins" actually true.
  *
  * @returns {{ ok: boolean, conflictDays?: string[], expiresAt?: Date }}
  */
@@ -176,61 +128,38 @@ export async function holdDates(reservation) {
   if (!accommodation) return { ok: false, conflictDays: [], reason: "listing_not_found" };
 
   const now = new Date();
-  const start = new Date(reservation.checkInDate);
-  const end = new Date(reservation.checkOutDate);
+  const wanted = dayKeys(reservation.checkInDate, reservation.checkOutDate);
 
   // Clear the guest's own abandoned attempt first — otherwise their previous
   // hold reads as somebody else's booking and refuses them their own dates.
   await dropSupersededHolds(accommodation, reservation, now);
-  if (accommodation.isModified("occupancyCalendar")) await accommodation.save();
+
+  const taken = occupiedDays(accommodation, { exceptReservationId: reservation._id, now });
+
+  const conflictDays = wanted.filter((d) => taken.has(d));
+  if (conflictDays.length) {
+    return { ok: false, conflictDays, reason: "dates_unavailable" };
+  }
 
   const expiresAt = new Date(now.getTime() + HOLD_MINUTES * 60000);
 
-  // Drop this booking's own previous hold, so a guest who returns to checkout
-  // does not accumulate rows. Separate from the claim below because $pull and
-  // $push on the same array in one update are not allowed.
-  await Accommodation.updateOne(
-    { _id: listingId },
-    { $pull: { occupancyCalendar: { status: "held", reservationId: reservation._id } } }
+  // Drop this booking's own previous hold before writing a fresh one, so a
+  // guest who returns to checkout does not accumulate rows.
+  accommodation.occupancyCalendar = (accommodation.occupancyCalendar || []).filter(
+    (entry) =>
+      !(entry.status === "held" && String(entry.reservationId || "") === String(reservation._id))
   );
 
-  const claimed = await Accommodation.findOneAndUpdate(
-    {
-      _id: listingId,
-      occupancyCalendar: {
-        $not: overlapFilter({ start, end, exceptReservationId: reservation._id, now }),
-      },
-    },
-    {
-      $push: {
-        occupancyCalendar: {
-          startDate: reservation.checkInDate,
-          endDate: reservation.checkOutDate,
-          guestName: reservation.name || "N/A",
-          status: "held",
-          holdExpiresAt: expiresAt,
-          reservationId: reservation._id,
-        },
-      },
-    },
-    { new: true }
-  );
+  accommodation.occupancyCalendar.push({
+    startDate: reservation.checkInDate,
+    endDate: reservation.checkOutDate,
+    guestName: reservation.name || "N/A",
+    status: "held",
+    holdExpiresAt: expiresAt,
+    reservationId: reservation._id,
+  });
 
-  if (!claimed) {
-    // Lost the race, or the dates were already taken. Re-read to report WHICH
-    // days conflict, so the client can offer alternatives.
-    const current = await Accommodation.findById(listingId);
-    const taken = occupiedDays(current, { exceptReservationId: reservation._id });
-    const conflictDays = dayKeys(reservation.checkInDate, reservation.checkOutDate).filter((d) =>
-      taken.has(d)
-    );
-
-    return {
-      ok: false,
-      conflictDays,
-      reason: "dates_unavailable",
-    };
-  }
+  await accommodation.save();
 
   return { ok: true, expiresAt };
 }
@@ -271,9 +200,6 @@ export async function confirmHold(reservation) {
   const taken = occupiedDays(accommodation, { exceptReservationId: reservation._id, now });
   const conflictDays = wanted.filter((d) => taken.has(d));
 
-  // Read-then-check is fine HERE and not in holdDates: by this point the guest
-  // has already paid, so the only useful outcome of a conflict is an alert to a
-  // human — there is nothing to serialise against.
   if (conflictDays.length) {
     // The guest has already paid, so this needs a human: either a refund or a
     // move. Silently booking the non-conflicting nights is what used to happen

@@ -157,22 +157,17 @@ export const getHostProfile = async (req, res) => {
 export const getHostById = async (req, res) => {
   const { userId } = req.params;
 
+  console.log("Received userId:", userId); // Log userId
+
   // Check if userId is a valid ObjectId
   if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.log("Invalid userId format:", userId); // Log invalid userId
     return res.status(400).json({ message: "Invalid host ID format" });
   }
 
   try {
-    // Fetch host by ID from the database.
-    //
-    // Explicitly projected. This route is UNAUTHENTICATED and is reached from
-    // every public listing page, and it used to answer with the whole document:
-    // the bcrypt password hash, `resetPasswordToken`, and every Stripe account
-    // id the host holds. A password hash handed to anyone who asks is an offline
-    // cracking target, and a live reset token is an account takeover.
-    const user = await Host.findById(userId).select(
-      "-password -resetPasswordToken -resetPasswordExpires -payoutIbanFull"
-    );
+    // Fetch host by ID from the database
+    const user = await Host.findById(userId);
 
     // If the host doesn't exist, return a 404
     if (!user) {

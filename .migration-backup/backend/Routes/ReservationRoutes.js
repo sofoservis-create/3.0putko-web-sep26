@@ -19,7 +19,6 @@ import {
   declineBookingRequest
 } from '../Controllers/ReservationController.js';
 import { authenticate } from '../auth/verifyToken.js';
-import { requireAdmin, requireReservationAccess } from '../auth/authorize.js';
 
 const router = express.Router();
 
@@ -35,43 +34,34 @@ router.get('/quote/:accommodationId', getStayQuote);
 
 // POST: Create a new reservation
 router.post('/', createReservation);
-
-// Every route below reads or writes somebody's booking: guest name, email,
-// phone, dates, amounts, payment and payout state. All of them were open to the
-// internet — `GET /` alone returned the entire reservation collection.
-//
-// Single-booking routes go through requireReservationAccess, which admits the
-// owning host, the booking's guest, an admin, or the holder of the booking's own
-// capability token, and nobody else. The bulk and by-name routes have no
-// per-object owner to check against, so they are admin-only.
 // Update reservation route
-router.put("/reservations/:id", requireReservationAccess({ param: "id", allow: ["host", "admin"] }), updateReservation);
-router.get("/deleted", requireAdmin, getDeletedReservations); // Get deleted reservations
-router.post("/restore/:id", requireAdmin, restoreReservation); // Restore reservation
-router.delete("/delete/:id", requireAdmin, deleteReservationPermanently); // Permanently delete reservation
+router.put("/reservations/:id", updateReservation);
+router.get("/deleted", getDeletedReservations); // Get deleted reservations
+router.post("/restore/:id", restoreReservation); // Restore reservation
+router.delete("/delete/:id", deleteReservationPermanently); // Permanently delete reservation
 // GET: Get all reservations
-router.get('/', requireAdmin, getAllReservations);
+router.get('/', getAllReservations);
 
 // GET: Get a specific reservation by ID
-router.get('/:id', requireReservationAccess({ param: "id" }), getReservationById);
+router.get('/:id', getReservationById);
 
 // PUT: Update a reservation
-router.put('/name/:name', requireAdmin, updateReservationByName);
+router.put('/name/:name', updateReservationByName);
 
 // DELETE: Delete a reservation 
-router.delete('/:id', requireReservationAccess({ param: "id", allow: ["host", "admin"] }), deleteReservation);
+router.delete('/:id', deleteReservation);
 
 // GET: Get reservations by name (new route)
-router.get('/name/:name', requireAdmin, getReservationByName);  // This is the new route
+router.get('/name/:name', getReservationByName);  // This is the new route
 
 // Route to get reservations by accommodation provider
-router.get('/provider/:providerId', authenticate, getReservationByAccommodationProvider);
+router.get('/provider/:providerId', getReservationByAccommodationProvider);
 
 // New route for getting reservations by user ID
-router.get('/user/:userId', authenticate, getReservationsByUserId);
+router.get('/user/:userId', getReservationsByUserId);
 
 // Route to delete reservations by user ID
-router.delete('/user/:userId', requireAdmin, deleteReservationsByUserId); 
+router.delete('/user/:userId', deleteReservationsByUserId); 
 
 router.get("/check/:accommodationId/:providerId", checkReservationsForAccommodation);
 

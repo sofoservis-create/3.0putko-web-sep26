@@ -4,44 +4,13 @@ Putko is a Slovak accommodation marketplace for discovering verified stays, book
 
 ## Run & Operate
 
-**The Run button starts `@workspace/web`** — the current app (Next.js 15).
-`artifacts/putko` and `artifacts/api-server` are earlier work kept in the
-repo; they are not what runs.
-
-**To get it running, use the Shell, not the Run button:**
-
-```sh
-bash scripts/replit-start.sh
-```
-
-It checks the pull, the dependencies and the database in order, says which
-one is missing, sets up the database if it is empty, and starts the app on
-`0.0.0.0:5000`. Then open the webview.
-
-Database only, if you want just that step:
-
-```sh
-DATABASE_URL=... bash scripts/setup-db.sh
-```
-
-That creates the extensions, applies migrations and seeds. It is idempotent.
-**PostGIS is required** — the destination browse layer is built on
-`ST_DWithin` and the script fails clearly if it is missing.
-
-- `pnpm --filter @workspace/web run dev` — the app (port 3000 locally, 5000 on Replit)
-- `pnpm --filter @workspace/web run build` — production build
-- `bash scripts/setup-db.sh` — extensions + migrations + seed, idempotent
-- `pnpm --filter @workspace/db run migrate` — apply migrations only
-- `pnpm --filter @workspace/api-server run dev` — legacy API server scaffold
-- `pnpm --filter @workspace/putko run dev` — legacy Vite app
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/putko run dev` — run the Putko web app through its managed artifact workflow
+- `pnpm --filter @workspace/putko run build` — create the production web bundle
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- **Never `drizzle-kit push` on this project.** `listings.geog` and
-  `destinations.centre` are PostGIS columns that drizzle-kit cannot emit, so
-  they live in hand-written migrations. push diffs the TypeScript schema and
-  would create every table without them — the schema would look complete and
-  every geographic query would fail. Use `migrate`.
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -53,19 +22,9 @@ That creates the extensions, applies migrations and seeds. It is idempotent.
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
-## Demo login (development only)
-
-`demo-hostka@putko.example` (guest) / `demo-host@putko.example` (host),
-password `putko-demo-2026`. Fictional accounts; the seed refuses
-`NODE_ENV=production`.
-
 ## Where things live
 
-- `artifacts/web/` — **the current app**: Next.js 15, App Router, Server
-  Components reading Postgres directly. Design tokens in
-  `app/globals.css` — no hex value belongs anywhere else.
-- `lib/auth/` — password and session primitives (scrypt, timingSafeEqual)
-- `artifacts/putko/` — legacy migrated React + Vite web app
+- `artifacts/putko/` — migrated React + Vite web app
 - `artifacts/putko/src/AppRoutes.jsx` — browser route map converted from the original Next.js app directory
 - `artifacts/putko/src/app/globals.css` — original Putko styles and theme utilities
 - `artifacts/api-server/` — shared Replit API scaffold
@@ -96,10 +55,3 @@ _Populate as you build — explicit user instructions worth remembering across s
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
-
-## Reference
-
-- `CLAUDE.md` — architecture, binding business rules, gotchas that cost real time
-- `docs/ACCOUNTS.md` — guest account and host area
-- `docs/DESTINATIONS.md` — the destination catalogue
-- `audit/REPORT.md` — 63 findings against the old system

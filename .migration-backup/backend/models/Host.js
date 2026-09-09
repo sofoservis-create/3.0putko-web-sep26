@@ -226,12 +226,6 @@ localTaxPerPersonNight: { type: Number, default: 0 },
 resetPasswordToken: { type: String },
 resetPasswordExpires: { type: Date },
 isVerified: { type: Boolean, default: false },
-
-// Set when the account is deactivated for repeatedly cancelling confirmed
-// bookings. Nothing enforced this rule before — a host could cancel on guests
-// indefinitely with no consequence at all.
-deactivatedAt: { type: Date },
-deactivationReason: { type: String },
 }, { timestamps: true });
 
 // Fields required before Putko can raise a compliant Slovak invoice for its fee.
