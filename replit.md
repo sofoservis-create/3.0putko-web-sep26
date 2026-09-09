@@ -8,7 +8,17 @@ Putko is a Slovak accommodation marketplace for discovering verified stays, book
 `artifacts/putko` and `artifacts/api-server` are earlier work kept in the
 repo; they are not what runs.
 
-First time on a new database, once:
+**To get it running, use the Shell, not the Run button:**
+
+```sh
+bash scripts/replit-start.sh
+```
+
+It checks the pull, the dependencies and the database in order, says which
+one is missing, sets up the database if it is empty, and starts the app on
+`0.0.0.0:5000`. Then open the webview.
+
+Database only, if you want just that step:
 
 ```sh
 DATABASE_URL=... bash scripts/setup-db.sh

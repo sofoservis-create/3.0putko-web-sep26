@@ -8,24 +8,46 @@ Whatever you pick, it is two things: a database, and somewhere to run the app.
 
 ---
 
-## Option A — Replit (simplest; already wired)
+## Option A — Replit
 
-Everything is configured: `.replit` has the Run workflow, bound to
-`0.0.0.0:5000` because Replit proxies from outside the container.
+Pull `main`, then in the **Shell** (not the Run button):
 
-1. Open the Repl and pull `main`.
-2. In the Shell, once:
-   ```sh
-   bash scripts/setup-db.sh
-   ```
-   Extensions → migrations → seed. Idempotent, safe to re-run.
-3. Press **Run**. The link is the `*.replit.dev` URL in the webview.
+```sh
+bash scripts/replit-start.sh
+```
 
-**The one risk:** Replit's Postgres may not have PostGIS. The script checks
-and stops with a clear sentence if it is missing rather than dying halfway
-through a migration. If it does stop, use the database from Option B and
-keep running the app on Replit — set `DATABASE_URL` in Replit **Secrets**
-(not in a file) and re-run the script.
+That is the whole thing. It checks four prerequisites in order and tells
+you which one is missing rather than failing quietly:
+
+1. **Is the new code here?** If `artifacts/web` is absent the pull did not
+   land, and it prints the git commands to check why.
+2. **Dependencies** — runs `pnpm install` if `node_modules` is missing.
+3. **Database** — if `DATABASE_URL` is unset it says to create one in the
+   Database tab; if the database is empty it runs `setup-db.sh` itself.
+4. **Starts the app** on `0.0.0.0:5000`.
+
+Then open the webview, or the `*.replit.dev` URL.
+
+### Why not the Run button
+
+The Run button reads a workflow that Replit may also manage in its UI, so
+editing `.replit` does not reliably change what Run does — you press it,
+the old thing starts, and nothing tells you why. The script does not depend
+on it. (`.replit` does define the workflow, so Run may well work; the
+script is what to use when it does not.)
+
+### `-H 0.0.0.0` is not optional
+
+Replit proxies in from outside the container. A server bound to `localhost`
+is running perfectly and unreachable — which looks exactly like "nothing
+happened".
+
+### If PostGIS is missing
+
+Use Replit's **Database** tab (its Postgres supports PostGIS) rather than a
+local Nix `postgresql-16`, which does not ship it. Or point `DATABASE_URL`
+at the Render database from Option B and keep running the app on Replit —
+set it in Replit **Secrets**, never in a file.
 
 ---
 
