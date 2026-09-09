@@ -1,0 +1,997 @@
+Act as a senior full-stack product engineer and UX architect with extensive experience building accommodation marketplaces such as Airbnb, Booking.com, Vrbo, and modern short-term rental SaaS products.
+
+I want you to perform a complete audit and redesign proposal for the **Host Profile, Host Dashboard, and Host Onboarding experience** of our accommodation platform.
+
+## IMPORTANT EXISTING SYSTEM CONSTRAINT
+
+We **already have the accommodation creation / adding accommodation logic implemented**.
+
+Do NOT assume this needs to be rebuilt from scratch.
+
+Do NOT replace the current accommodation creation architecture unless you identify a concrete technical or UX reason why part of it must change.
+
+Your job is primarily to audit:
+
+* how users enter the existing accommodation creation flow,
+* what happens before it,
+* what happens after it,
+* how the Host Dashboard connects to it,
+* how existing drafts are surfaced,
+* how hosts return to incomplete properties,
+* how newly created properties appear inside the Host area,
+* how the first-property experience differs from adding a second or tenth property,
+* how the current accommodation creation flow can be integrated more seamlessly into the overall Host experience.
+
+You should inspect the existing accommodation creation implementation first and treat it as the **current source of truth**.
+
+Where possible:
+
+**reuse existing logic, routes, backend functionality, validation, database structure, and components.**
+
+Improve or restructure only the UX shell, navigation, entry points, sequencing, or individual steps where there is a clear benefit.
+
+Do not create a parallel duplicate accommodation creation system.
+
+---
+
+# PRODUCT CONTEXT
+
+The platform is focused primarily on **short-term accommodation rentals in Slovakia**, with expansion to nearby European markets later.
+
+Our core principles are:
+
+* Mobile-first UX
+* Extremely simple host onboarding
+* Minimal cognitive load
+* Clean, premium visual design
+* No unnecessary screens or navigation
+* Clear progress indicators
+* Strong guidance for inexperienced hosts
+* Stripe-based online payments
+* Hosts should always know what they need to do next
+* The platform should feel closer to Airbnb in UX quality, but should not blindly copy Airbnb
+* Adapt the flow to Slovak hosts, apartments, cottages, pensions, glamping properties, guest houses, and professional operators
+
+Use **Airbnb Host UX as a product benchmark**, particularly for information hierarchy and usability, but design around our existing product architecture.
+
+---
+
+# FLOW 1 — USER REGISTERS DIRECTLY AS A HOST
+
+Audit the complete journey from the moment a new user chooses:
+
+**"Become a host" / "List your accommodation"**
+
+The existing accommodation creation flow already exists.
+
+The question is therefore:
+
+**What should happen around that flow?**
+
+Determine the optimal sequence.
+
+---
+
+## 1. Account creation
+
+Audit what information should be required during initial host registration.
+
+Keep registration lightweight.
+
+Determine which information is needed immediately versus later.
+
+Possible information:
+
+* Name
+* Email
+* Phone
+* Password / social login
+* Country
+* Language
+* Individual vs company
+
+Do not require unnecessary host, financial, or company information before the user can begin creating their first accommodation.
+
+Separate:
+
+**Required to create account**
+
+from:
+
+**Required before publishing**
+
+from:
+
+**Required before receiving payouts**
+
+---
+
+## 2. First screen after registration
+
+Define exactly what a new Host should see immediately after registration.
+
+The user must not land on an empty generic dashboard.
+
+Audit whether the best action is to immediately direct them into the existing accommodation creation flow.
+
+For example:
+
+**Welcome to Putko**
+
+"Let's add your first accommodation."
+
+[Add accommodation]
+
+Potentially:
+
+New Host
+→ Account created
+→ Host mode activated
+→ Existing Add Accommodation flow opens
+
+Determine whether an intermediate Host Dashboard is useful at all before the first property exists.
+
+Define:
+
+* Main CTA
+* Welcome state
+* Sidebar visibility
+* Header
+* Progress messaging
+* Empty state
+* Exit behaviour
+* How the user returns if they leave onboarding
+* Whether unfinished accommodation drafts are shown immediately
+
+The user should always have one obvious next action.
+
+---
+
+# EXISTING ACCOMMODATION CREATION FLOW
+
+Do not redesign this blindly.
+
+First inspect the existing implementation.
+
+Audit:
+
+* current routes,
+* steps,
+* validation,
+* database persistence,
+* autosave behaviour,
+* draft behaviour,
+* completion logic,
+* publish logic,
+* responsive behaviour,
+* navigation between steps,
+* calendar synchronization,
+* pricing setup,
+* photos,
+* amenities,
+* property information,
+* preview,
+* Stripe dependencies.
+
+Then classify each part as:
+
+**KEEP**
+
+Current implementation is already good.
+
+**IMPROVE UX**
+
+Underlying logic should remain, but UI/interaction should improve.
+
+**RESTRUCTURE**
+
+Current functionality should remain but be reorganized.
+
+**REBUILD ONLY IF NECESSARY**
+
+There is a concrete architectural or functional problem.
+
+The goal is to preserve working functionality.
+
+---
+
+# FIRST ACCOMMODATION EXPERIENCE
+
+Even though the accommodation creation logic exists, the first-property experience may require additional product guidance.
+
+Audit how the existing flow should behave when the Host has:
+
+**0 existing accommodations**
+
+versus:
+
+**1+ accommodations**
+
+For a first-time Host, consider:
+
+* stronger explanation,
+* clearer progress,
+* more contextual help,
+* fewer advanced options initially,
+* explicit publish requirements,
+* Stripe setup guidance,
+* preview guidance.
+
+For an experienced Host adding another accommodation, the flow can be more efficient.
+
+Do not unnecessarily force repeat education.
+
+---
+
+# DRAFT ACCOMMODATIONS
+
+Audit how unfinished accommodation creation should work across the Host Dashboard.
+
+If the Host leaves midway through the existing Add Accommodation flow:
+
+What should happen?
+
+The draft should be easily recoverable.
+
+For example:
+
+**Finish setting up your accommodation**
+
+Mountain Chalet
+
+74% complete
+
+[Continue setup]
+
+The Host should never need to search through multiple menus to find an unfinished listing.
+
+Audit:
+
+* draft visibility,
+* progress calculation,
+* dashboard reminders,
+* property card states,
+* resume CTA,
+* deletion,
+* duplicate accommodation,
+* preview.
+
+---
+
+# PROPERTY COMPLETION
+
+If completion tracking already exists, reuse it.
+
+If it does not, propose the smallest possible addition to the existing architecture.
+
+Hosts should understand:
+
+* what is complete,
+* what is missing,
+* what is optional,
+* what blocks publication.
+
+For example:
+
+Accommodation setup
+
+8 of 10 required sections completed
+
+Missing:
+
+* Availability
+* Payout setup
+
+Do not create a second onboarding state system if the current listing logic can already determine completeness.
+
+---
+
+# FLOW 2 — EXISTING TRAVELER BECOMES A HOST
+
+Audit what happens when an existing Traveler chooses:
+
+**"Become a Host"**
+
+The user already has an account.
+
+Do NOT create another account.
+
+The correct model should generally be:
+
+**User**
+→ Traveler capabilities
+→ Host capabilities added
+
+The same account may therefore be:
+
+* Traveler only
+* Host only
+* Traveler + Host
+
+Audit the optimal transition.
+
+For example:
+
+Traveler
+→ Clicks "Become a Host"
+→ Host capability activated
+→ Short Host introduction
+→ Existing Add Accommodation flow
+→ Accommodation completed
+→ Stripe / payout setup
+→ Publish
+→ Host Dashboard
+
+Determine whether any steps should be different.
+
+Audit:
+
+* role architecture,
+* mode switching,
+* account navigation,
+* traveler data reuse,
+* profile reuse,
+* phone/email reuse,
+* how the user switches between Traveler and Host experiences.
+
+The transition should feel like unlocking additional functionality, not registering for another platform.
+
+---
+
+# FLOW 3 — EXISTING HOST ADDS ANOTHER ACCOMMODATION
+
+This flow is important because the Add Accommodation logic already exists.
+
+Audit how an existing Host should initiate it.
+
+Possible entry points:
+
+Host Dashboard:
+
+[Add accommodation]
+
+Properties:
+
+[Add accommodation]
+
+Desktop header:
+
+[Add accommodation]
+
+Mobile:
+
+Floating or contextual CTA
+
+Determine the optimal placement without creating unnecessary duplicate CTAs.
+
+When adding another property:
+
+* do not repeat Host registration,
+* do not repeat Stripe onboarding if already completed,
+* reuse company information,
+* reuse Host profile information,
+* reuse payout account where appropriate.
+
+The Add Accommodation flow should focus on the property itself.
+
+---
+
+# FLOW 4 — MULTI-PROPERTY HOST
+
+The Host architecture must scale beyond a single accommodation.
+
+Design for:
+
+1 property
+5 properties
+20+ properties
+
+Audit:
+
+* property switcher,
+* global vs property-specific navigation,
+* calendar,
+* reservations,
+* availability,
+* pricing,
+* analytics,
+* payouts,
+* messages.
+
+Be explicit about which information belongs at:
+
+**Account level**
+
+versus:
+
+**Host level**
+
+versus:
+
+**Property level**
+
+---
+
+# HOST DASHBOARD
+
+Design the optimal Host Dashboard around the existing product functionality.
+
+Prioritize actionable information.
+
+Potential sections:
+
+* Upcoming reservations
+* New bookings
+* Reservation requests, if applicable
+* Check-ins today
+* Check-outs today
+* Unfinished accommodation setup
+* Property alerts
+* Stripe / payout setup warning
+* Calendar conflicts
+* Messages
+* Reviews
+* Revenue
+* Occupancy
+
+Do not overload the screen.
+
+The first viewport should answer:
+
+**What requires my attention right now?**
+
+---
+
+# HOST SIDEBAR / NAVIGATION
+
+Audit the current Host navigation.
+
+Determine whether the optimal architecture should resemble:
+
+Host
+
+* Overview
+* Calendar
+* Reservations
+* Properties
+* Messages
+* Earnings
+* Reviews
+* Settings
+
+But do not follow this structure automatically.
+
+Inspect the current application first.
+
+Keep the navigation as small as reasonably possible.
+
+Property-specific configuration such as:
+
+* Photos
+* Amenities
+* Description
+* Pricing
+* Availability
+* House rules
+* Calendar sync
+
+should generally live inside the accommodation/property management area rather than cluttering the global Host sidebar.
+
+---
+
+# MOBILE-FIRST HOST UX
+
+Treat mobile as a first-class management interface.
+
+Do not simply shrink desktop UI.
+
+Audit:
+
+* bottom navigation,
+* mobile header,
+* property switcher,
+* reservation cards,
+* calendar interaction,
+* dashboard,
+* forms,
+* property editing,
+* draft continuation,
+* sticky primary CTA,
+* modal usage,
+* touch targets,
+* keyboard behaviour,
+* step navigation.
+
+A Host should be able to perform the majority of routine operations from a phone.
+
+Use desktop layouts as an expansion of the mobile information architecture.
+
+---
+
+# STRIPE / PAYMENTS
+
+The platform uses Stripe for online payments.
+
+Audit how Stripe onboarding fits around the existing accommodation creation flow.
+
+Do not require Stripe onboarding unnecessarily early.
+
+A Host should generally be able to:
+
+1. Create an account
+2. Build their accommodation
+3. Preview it
+
+before being forced to complete financial onboarding.
+
+However, define the exact point at which Stripe becomes mandatory.
+
+Potential requirement:
+
+Host cannot publish / accept paid bookings until:
+
+* Stripe account is connected
+* Required KYC is completed
+* Payout information is valid
+
+Clearly separate:
+
+**Accommodation configuration**
+
+from:
+
+**Host payout configuration**
+
+Do not mix Stripe fields into accommodation-specific data unless technically required.
+
+---
+
+# PROPERTY STATES
+
+Inspect the current listing/property state logic before proposing changes.
+
+Reuse current states wherever possible.
+
+Determine whether the platform needs states such as:
+
+* Draft
+* Published
+* Paused
+* Unlisted
+* Suspended
+
+Avoid redundant states such as both "Draft" and "Incomplete" unless they represent genuinely different behaviour.
+
+For every state define:
+
+* Guest visibility
+* Host actions
+* Booking eligibility
+* Search visibility
+* Editing permissions
+* publication requirements
+
+---
+
+# HOST ACCOUNT ARCHITECTURE
+
+Audit the existing backend architecture.
+
+Determine whether responsibilities are correctly separated between:
+
+**User**
+
+Authentication and global identity.
+
+**Traveler Profile**
+
+Traveler-specific information.
+
+**Host Profile**
+
+Host-specific operational information.
+
+**Property / Accommodation**
+
+Listing-specific information.
+
+**Organization / Business**
+
+Optional company or professional operator data.
+
+**Stripe Account**
+
+Payment and payout relationship.
+
+**Reservation**
+
+Booking data.
+
+**Payout**
+
+Financial settlement data.
+
+Avoid unnecessary duplication.
+
+A Host should not have a separate authentication account from their Traveler account.
+
+---
+
+# UX PRINCIPLES
+
+Apply these principles throughout the audit.
+
+## 1. Progressive disclosure
+
+Do not expose advanced settings before they are relevant.
+
+## 2. Strong empty states
+
+Never show:
+
+"No properties."
+
+Show something actionable:
+
+"You haven't added an accommodation yet."
+
+[Add your first accommodation]
+
+## 3. One primary action per screen
+
+Avoid competing CTAs.
+
+## 4. Action-first Host Dashboard
+
+Show problems, tasks, and upcoming operations before vanity metrics.
+
+## 5. Preserve working logic
+
+Do not rebuild functioning backend systems for cosmetic reasons.
+
+## 6. Guided editing
+
+Use progressive forms, cards, context, and status indicators instead of huge settings pages.
+
+## 7. Autosave
+
+Where supported by the current architecture, changes should save automatically.
+
+## 8. Preview
+
+Hosts should frequently have access to:
+
+**Preview as guest**
+
+## 9. Consistency
+
+Adding the first property and adding the tenth property should use the same underlying accommodation system.
+
+Only the surrounding guidance should change.
+
+---
+
+# AIRBNB AS REFERENCE
+
+Use Airbnb primarily as a reference for:
+
+* Host mode
+* Host onboarding
+* Listing management
+* Host navigation
+* Property switching
+* Mobile UX
+* Calendar UX
+* Progressive disclosure
+* Empty states
+* Actionable dashboard design
+
+Do not copy Airbnb pixel-for-pixel.
+
+Airbnb supports a significantly more complex global marketplace.
+
+Our product is initially narrower:
+
+**Slovak short-term accommodation + online reservations + Stripe payments.**
+
+Our Host experience should therefore be simpler.
+
+---
+
+# AUDIT THE EXISTING CODEBASE FIRST
+
+Before suggesting implementation changes, inspect:
+
+* existing routes,
+* existing Host pages,
+* existing Traveler pages,
+* authentication,
+* roles and permissions,
+* current Add Accommodation implementation,
+* accommodation database entities,
+* property states,
+* API endpoints,
+* Stripe implementation,
+* dashboard components,
+* navigation,
+* responsive behaviour,
+* mobile components,
+* shared components.
+
+Do not make assumptions when the answer exists in the codebase.
+
+---
+
+# REQUIRED OUTPUT
+
+Do NOT immediately modify the application.
+
+First return a structured audit.
+
+## 1. Current Host Architecture
+
+Document how the Host system currently works.
+
+Include:
+
+* routes,
+* components,
+* database entities,
+* APIs,
+* authentication,
+* roles,
+* Add Accommodation flow,
+* property state handling,
+* Stripe integration,
+* mobile architecture.
+
+---
+
+## 2. Existing Add Accommodation Audit
+
+Create a table:
+
+| Area            | Current implementation | Recommendation | Action      |
+| --------------- | ---------------------- | -------------- | ----------- |
+| Property basics | ...                    | ...            | KEEP        |
+| Photos          | ...                    | ...            | IMPROVE UX  |
+| Pricing         | ...                    | ...            | KEEP        |
+| Availability    | ...                    | ...            | RESTRUCTURE |
+
+Allowed actions:
+
+**KEEP**
+
+**IMPROVE UX**
+
+**RESTRUCTURE**
+
+**REBUILD**
+
+Default toward preserving existing functionality.
+
+---
+
+## 3. UX Problems
+
+Identify issues and rank them:
+
+**Critical**
+
+**High**
+
+**Medium**
+
+**Low**
+
+Focus particularly on:
+
+* unclear entry points,
+* dead ends,
+* duplicate navigation,
+* missing first-time guidance,
+* inability to recover drafts,
+* bad mobile UX,
+* unnecessary pages,
+* confusing Host/Traveler switching,
+* inconsistent CTAs,
+* excessive settings,
+* poor empty states.
+
+---
+
+## 4. Proposed Host Information Architecture
+
+Provide a tree.
+
+Clearly distinguish:
+
+**Global Host navigation**
+
+from:
+
+**Property-specific management**
+
+For example:
+
+Host
+├── Overview
+├── Calendar
+├── Reservations
+├── Properties
+│   ├── Property A
+│   │   ├── Listing
+│   │   ├── Pricing
+│   │   ├── Availability
+│   │   └── Settings
+├── Messages
+├── Earnings
+└── Settings
+
+Create your own recommended structure based on the actual application.
+
+---
+
+## 5. Complete User Flows
+
+Map these flows step by step.
+
+### Flow A
+
+New user
+→ Registers specifically to become Host
+→ Starts first accommodation
+→ Completes existing accommodation flow
+→ Completes Stripe requirements
+→ Publishes
+→ Host Dashboard
+
+### Flow B
+
+Existing Traveler
+→ Becomes Host
+→ Existing Add Accommodation flow
+→ Publish
+→ Host Dashboard
+
+### Flow C
+
+Existing Host
+→ Adds second accommodation
+
+### Flow D
+
+Host leaves accommodation setup at 45%
+→ Returns two days later
+→ Continues exactly where they stopped
+
+### Flow E
+
+Professional Host
+→ Switches between multiple properties
+→ Manages bookings / availability / pricing
+
+---
+
+## 6. Host Dashboard Design
+
+For each dashboard state describe:
+
+### No accommodations
+
+### Draft accommodation only
+
+### One published accommodation
+
+### Multiple published accommodations
+
+### Host with urgent actions
+
+Define:
+
+* information hierarchy,
+* primary CTA,
+* cards,
+* alerts,
+* mobile behaviour.
+
+---
+
+## 7. Mobile UX Architecture
+
+Describe the Host experience specifically for mobile.
+
+Include:
+
+* navigation,
+* dashboard,
+* accommodation switcher,
+* reservations,
+* calendar,
+* accommodation editing,
+* draft continuation,
+* Add Accommodation entry point,
+* Stripe alerts.
+
+---
+
+## 8. Technical Architecture Recommendations
+
+Only propose backend changes where justified.
+
+Clearly separate recommendations into:
+
+**No backend change required**
+
+**Small backend adjustment**
+
+**Architecture change required**
+
+Avoid large rewrites where existing architecture can support the desired UX.
+
+---
+
+## 9. Implementation Roadmap
+
+Create a prioritized implementation plan.
+
+Focus first on connecting and improving the existing systems.
+
+Example:
+
+### Phase 1 — Host shell
+
+Host mode, navigation, account switching.
+
+### Phase 2 — First-time Host experience
+
+Registration → first accommodation entry.
+
+### Phase 3 — Integrate existing Add Accommodation flow
+
+Draft recovery, progress, dashboard integration.
+
+### Phase 4 — Host Dashboard
+
+Actionable dashboard states.
+
+### Phase 5 — Multi-property UX
+
+Property switching and management.
+
+### Phase 6 — Stripe onboarding
+
+Publishing and payout requirements.
+
+### Phase 7 — Mobile polish
+
+Responsive UX and touch-first interactions.
+
+Adjust this roadmap based on the actual codebase.
+
+---
+
+# FINAL OBJECTIVE
+
+Do not treat this as a request to rebuild our accommodation creation system.
+
+The accommodation creation functionality already exists.
+
+Treat the project as:
+
+**building the correct Host product architecture around the existing Add Accommodation system.**
+
+The complete experience should become:
+
+**Account**
+→ **Enable Host**
+→ **Existing Add Accommodation**
+→ **Draft / Completion**
+→ **Stripe**
+→ **Publish**
+→ **Host Dashboard**
+→ **Reservations / Calendar / Earnings / Property Management**
+
+The final product should feel seamless, premium, mobile-first, and considerably simpler than Airbnb while retaining the UX quality expected from a modern accommodation marketplace.
+
+Before changing any code, return the audit, proposed architecture, flows, identified issues, and implementation roadmap.
