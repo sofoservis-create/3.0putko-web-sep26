@@ -251,6 +251,12 @@ message *or* in the timing. See `docs/ACCOUNTS.md`.
 
 Each of these cost real debugging time. Don't rediscover them.
 
+- **The build must work without `DATABASE_URL`.** `next build` imports every
+  page to collect its config, so anything that throws at module import time
+  kills the build on every host. `lib/db/src/index.ts` creates the pool AND
+  the Drizzle handle lazily — both, because `drizzle()` reads a property off
+  the client while constructing, so making only the pool lazy just moved the
+  error. Verify with `env -u DATABASE_URL pnpm build`.
 - **`drizzle.config.ts` paths must be relative.** drizzle-kit prefixes its own
   `./` onto `out`/`schema`, so `path.join(__dirname, ...)` produces a doubled,
   unresolvable path (`.//home/...`) and breaks `generate`/`migrate` entirely.
@@ -309,6 +315,7 @@ Each of these cost real debugging time. Don't rediscover them.
 
 ## Reference documents
 
+- `docs/DEPLOY.md` — how to get a public link (Replit / Vercel+Render / Render)
 - `docs/REBUILD-PLAN.md` — phased roadmap, gates, and what's deliberately deferred
 - `docs/DESTINATIONS.md` — the "Obľúbené miesta" catalogue, awaiting the owner's corrections
 - `docs/ACCOUNTS.md` — guest account and host area: what the old ones do, what replaced them
