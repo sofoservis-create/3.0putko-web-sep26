@@ -8,6 +8,20 @@
       "when": 1788821806341,
       "tag": "0000_zippy_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788940643217,
+      "tag": "0001_marketplace_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788940661079,
+      "tag": "0002_geography_and_exclusion",
+      "breakpoints": true
     }
   ]
 }
