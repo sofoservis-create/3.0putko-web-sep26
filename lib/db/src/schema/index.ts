@@ -23,6 +23,7 @@ export * from "./test-guest-favorites";
 export * from "./test-host-accommodations";
 
 export * from "./regions";
+export * from "./destinations";
 export * from "./listings";
 export * from "./bookings";
 export * from "./calendar-blocks";

@@ -74,7 +74,14 @@ pnpm run generate -- --custom --name <name>   # empty migration for hand-written
 pnpm run migrate                  # apply migrations
 pnpm run push                     # push schema directly (dev only)
 pnpm run verify:no-double-booking # the overlap-constraint proof (see below)
+pnpm run seed:destinations        # the "Obľúbené miesta" catalogue (idempotent)
+pnpm run verify:destinations      # tile counts == page results (see below)
+pnpm exec tsx scripts/smoke-destination-queries.ts   # the exported query fns
 ```
+
+Both verify scripts write fixtures inside a transaction they always roll
+back, so they are safe to re-run — but point `DATABASE_URL` at a throwaway
+database anyway, never production.
 
 All `lib/db` commands need `DATABASE_URL`. A local `.env.local` holds it
 (gitignored); export it first: `export $(cat .env.local | xargs)`.
@@ -120,6 +127,43 @@ exactly the race this closes. Claim dates through `claimDates()` in
 `{ ok: false, reason: "dates_unavailable" }` rather than throwing.
 
 Proof and reproduction: `lib/db/PROOF-no-double-booking.md`.
+
+### Destinations — counts that cannot lie
+
+The "Obľúbené miesta na Slovensku" browse layer (`destinations`). A listing
+belongs to a destination **by geography, not by a foreign key**: each
+destination is a `centre geography(Point,4326)` plus `radius_m`, and
+membership is `ST_DWithin(listings.geog, destinations.centre, radius_m)`.
+
+There is no `destination_listings` join table and no tagging step, on
+purpose. It means tile counts are a live `COUNT(*)`, so:
+
+> **the number on a tile == the number of results you get when you click it**
+
+That is the invariant, and it is held structurally: `MEMBERSHIP` in
+`lib/db/src/queries/destinations.ts` is one SQL fragment, and both the
+counting query and the listing query interpolate it. **Never** count
+listings for a tile with a different predicate than its page uses — that is
+audit finding D-01 (a hero reading "1433+ ubytovaní" above a catalogue of 6)
+reintroduced.
+
+Two consequences worth knowing before editing:
+
+- Destinations **overlap by design**. A chata near Štrbské pleso is in
+  Vysoké Tatry, Tatry, Spiš and Poprad simultaneously. That is the truth,
+  not a data error.
+- `parent_slug` is **navigation, not geometry**. A child's count comes from
+  the child's own circle, so child counts do not sum to the parent's, and a
+  child can even sit outside its parent's circle (Donovaly does). Never
+  render them as a breakdown.
+
+The catalogue itself is editorial and lives in
+`lib/db/scripts/seed-destinations.mjs`, not in a migration — correcting a
+radius means editing the array and re-running (idempotent upsert). After any
+edit run `pnpm run verify:destinations`: it asserts the invariant and
+carries an allowlist of every legitimate circle-overlaps-circle pair, so a
+radius change that quietly starts pulling Liptov listings into Orava fails
+the script instead of shipping.
 
 ### Data conventions
 
@@ -190,7 +234,9 @@ Each of these cost real debugging time. Don't rediscover them.
 ## Reference documents
 
 - `docs/REBUILD-PLAN.md` — phased roadmap, gates, and what's deliberately deferred
+- `docs/DESTINATIONS.md` — the "Obľúbené miesta" catalogue, awaiting the owner's corrections
 - `audit/REPORT.md` — 63 findings against the old system, each with `file:line`
+- `audit/DESIGN-AUDIT.md` — 22 design/UX findings, page by page
 - `audit/DECISIONS-NEEDED.md` — 10 open product/legal decisions
 - `audit/ARCHITECTURE.md` — Mermaid diagrams: components, booking state machine, payment lifecycle
 - `audit/patches/` — 30 verified patches for the old system (applied here to the snapshot; **not** deployed anywhere)
