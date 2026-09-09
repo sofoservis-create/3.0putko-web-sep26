@@ -2300,8 +2300,8 @@ function ClientPage({ accommodation, userAccommodations, similarAccommodations, 
                   </SwiperSlide>
                 ))}
               </Swiper>
-              <div className="swiper-button-prev !text-[#319a7a] !bg-white !w-10 !h-10 !rounded-full shadow-md after:!text-lg"></div>
-              <div className="swiper-button-next !text-[#319a7a] !bg-white !w-10 !h-10 !rounded-full shadow-md after:!text-lg"></div>
+              <div className="swiper-button-prev !hidden lg:!flex !text-[#319a7a] !bg-white !w-10 !h-10 !rounded-full shadow-md after:!text-lg"></div>
+              <div className="swiper-button-next !hidden lg:!flex !text-[#319a7a] !bg-white !w-10 !h-10 !rounded-full shadow-md after:!text-lg"></div>
               </>
             )}
           </div>

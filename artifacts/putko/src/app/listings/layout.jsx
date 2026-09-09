@@ -23,7 +23,8 @@ const DetailtLayoutInner = ({ children }) => {
   const handleCloseModalImageGallery = () => {
     const params = new URLSearchParams(document.location.search);
     params.delete("modal");
-    router.push(`${thisPathname}/?${params.toString()}`);
+    const query = params.toString();
+    router.push(query ? `${thisPathname}?${query}` : thisPathname);
   };
 
   return (

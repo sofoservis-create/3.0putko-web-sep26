@@ -23,7 +23,7 @@ export default function Modal({ images, onClose }) {
 
   function changePhotoId(newVal) {
     setCurIndex(newVal);
-    const newUrl = `${thisPathname}/?${getNewParam({ value: newVal })}`;
+    const newUrl = `${thisPathname}?${getNewParam({ value: newVal })}`;
     window.history.replaceState(null, "", newUrl);
   }
 

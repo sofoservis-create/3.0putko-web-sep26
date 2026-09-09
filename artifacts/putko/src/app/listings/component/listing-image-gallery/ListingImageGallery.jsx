@@ -68,7 +68,7 @@ const ListingImageGallery = ({ images = [], onClose, isShowModal }) => {
                 // Set the photoId in the URL when clicking on the image
                 let params = new URLSearchParams(document.location.search);
                 params.set("photoId", id); // Set photoId to the image ID
-                router.push(`${thisPathname}/?${params.toString()}`);
+                router.push(`${thisPathname}?${params.toString()}`);
               }}
             >
               {failedImages.includes(id) ? (
@@ -92,7 +92,8 @@ const ListingImageGallery = ({ images = [], onClose, isShowModal }) => {
             setLastViewedPhoto(photoId);
             let params = new URLSearchParams(document.location.search);
             params.delete("photoId");
-            router.push(`${thisPathname}/?${params.toString()}`);
+            const query = params.toString();
+            router.push(query ? `${thisPathname}?${query}` : thisPathname);
           }}
         />
       )}
