@@ -1,6 +1,30 @@
 # Putko — rebuild plan
 
-**Shape:** strangler migration. A new Next.js 15 + Postgres app takes over the site route by route while the current Express/MongoDB system keeps serving everything it hasn't taken over yet. No big-bang cutover night.
+> **REVISED — read this first.** This plan was written assuming a *strangler
+> migration*: the new app fronting the live putko.sk and proxying anything it
+> hadn't taken over yet. **That premise no longer holds.** The live site
+> deploys from a separate repository which is deliberately not being touched;
+> this repo is a standalone replacement built alongside it.
+>
+> What that changes:
+> - **Phase 0 (patching the live system) is not on the critical path.** The 30
+>   patches were applied to the `.migration-backup/` snapshot in this repo and
+>   are not deployed anywhere. They stand as evidence of what's wrong with the
+>   current build, not as a shipped fix.
+> - **The `LEGACY_ORIGIN` fallback-proxy in Phase 1.4 is unnecessary.** There
+>   is no legacy app to fall through to. Build routes directly.
+> - **The ETL from the old MongoDB (Phase 2.4) is deferred**, not deleted —
+>   development runs on synthetic seed data. Importing real listings is a
+>   separate decision, made when there's something worth importing them into.
+> - **Phase ordering is unchanged, but for a different reason.** Read path
+>   before money path is no longer about migrating safely — it's about
+>   reaching something demonstrable fastest. There is currently no URL anyone
+>   can open; that, not backend depth, is the binding constraint.
+>
+> Everything below still describes the target architecture accurately. Read
+> the sequencing as "what to build next," not "what to migrate next."
+
+**Shape:** standalone rebuild. A new Next.js 15 + Postgres app, built to stand on its own, with the existing Express/MongoDB system left untouched and used only as reference material.
 
 **Assumptions from the audit and your answers:**
 
