@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./queries/*": "./src/queries/*.ts"
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
@@ -14,7 +15,8 @@
     "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
     "seed:destinations": "node scripts/seed-destinations.mjs",
     "verify:no-double-booking": "node scripts/verify-exclusion-constraint.mjs",
-    "verify:destinations": "node scripts/verify-destination-membership.mjs"
+    "verify:destinations": "node scripts/verify-destination-membership.mjs",
+    "seed:demo-listings": "node scripts/seed-demo-listings.mjs"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

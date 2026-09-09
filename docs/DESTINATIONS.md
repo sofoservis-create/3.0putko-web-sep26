@@ -157,9 +157,40 @@ later is an edit to the array plus a re-run — no migration, no backfill.
 4. **Coordinates.** Approximate centre points from my own knowledge — fine for
    8–32 km radii, still worth a pass on a map.
 
-## Known limitation: circles
+## Known limitation: circles — now demonstrated, not hypothetical
 
-A circle cannot follow a ridge. Horehronie is the clearest case — a long
+**Liptov proves circles are not enough.** Measured from Liptov's centre:
+
+| Place | Distance | Region |
+|---|---|---|
+| Bešeňová | 6.6 km | Liptov |
+| Ružomberok | 15.5 km | Liptov |
+| Pribylina | 19.8 km | Liptov |
+| **Zuberec** | **20.7 km** | **Orava** |
+| Východná | 29.1 km | Liptov |
+
+Zuberec is nearer the centre of Liptov than Východná is. So **no radius
+includes the real Liptov and excludes Zuberec** — this is arithmetic, not a
+tuning problem, and it is why the demo listing *Chalupa pod Roháčmi,
+Zuberec* currently appears on the Liptov page.
+
+That is a product judgement to make, not a bug to hide: Zuberec is ~40
+minutes from Jasná, so a guest browsing Liptov and finding it is defensible,
+if not ideal. The behaviour is asserted in
+`verify-destination-membership.mjs` so it is locked and visible, and so the
+day it is fixed the test says so.
+
+**The fix, when it is worth doing, is polygons for the long-valley
+regions** — Liptov, Horehronie, probably Orava and Spiš. Replacing
+`centre + radius_m` with a `geography(Polygon)` and `ST_Covers` changes the
+one `MEMBERSHIP` fragment in `lib/db/src/queries/destinations.ts` and
+nothing else: no route, no component, no calling code. Circles stay correct
+for the compact destinations (resorts, spas, cities, individual ranges),
+so this is additive rather than a rewrite.
+
+### Why circles were still the right first model
+
+A circle cannot follow a ridge. Horehronie is the other case — a long
 east–west valley with the Nízke Tatry immediately north, so a circle wide
 enough to reach Telgárt at the eastern end also reaches over the ridge into
 Demänovská dolina: 18 km as the crow flies, an hour by road, and

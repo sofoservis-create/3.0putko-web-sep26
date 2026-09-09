@@ -102,8 +102,28 @@ try {
 
     check("an unknown slug returns null, not a crash",
       (await getDestination(t, "no-such-place")) === null);
-    check("an empty destination still resolves, with count 0",
-      (await getDestination(t, "bratislava"))?.listingCount === 0);
+    // Pick an empty destination from the data rather than naming one:
+    // this assertion originally used Bratislava, which was empty until
+    // seed-demo-listings.mjs put an apartment there. A test that names a
+    // specific row is a test that breaks when the data grows.
+    const { rows: emptyRows } = await tx.execute(sql`
+      SELECT d.slug
+        FROM destinations d
+        CROSS JOIN LATERAL (
+          SELECT count(*)::int AS n FROM listings l
+           WHERE l.status = 'published' AND l.geog IS NOT NULL
+             AND ST_DWithin(l.geog, d.centre, d.radius_m)
+        ) c
+       WHERE d.is_active AND c.n = 0
+       LIMIT 1
+    `);
+    const emptySlug = (emptyRows[0] as { slug: string } | undefined)?.slug;
+    check(
+      "an empty destination still resolves, with count 0 (not a 404)",
+      emptySlug !== undefined &&
+        (await getDestination(t, emptySlug))?.listingCount === 0,
+      emptySlug ? `used ${emptySlug}` : "no empty destination to test with"
+    );
 
     console.log("\ngetDestinationsForListing() — the listing-page breadcrumb\n");
     const { rows } = await tx.execute(sql`
@@ -126,8 +146,14 @@ try {
   }
 }
 
-const left = await db.execute(sql`SELECT count(*)::int AS n FROM listings`);
-check("rollback left no fixtures behind", (left.rows[0] as { n: number }).n === 0);
+// This script's OWN rows only. Asserting the whole table is empty passed
+// only while it was — and would have kept "passing" against real data
+// while proving nothing.
+const left = await db.execute(
+  sql`SELECT count(*)::int AS n FROM listings WHERE slug LIKE 'smoke-%'`
+);
+check("rollback left none of this script's fixtures behind",
+  (left.rows[0] as { n: number }).n === 0);
 
 await pool.end();
 

@@ -92,8 +92,14 @@ const COUNT_LATERAL = sql`
  */
 export async function getTopLevelDestinations(
   db: typeof Db,
-  limit = 12
+  limit: number | null = 12
 ): Promise<DestinationTile[]> {
+  // `null` means every one of them — the /miesta directory page. It is the
+  // same query rather than a second one written in the app layer, which
+  // matters: a copy of MEMBERSHIP living in a page component is precisely
+  // how the tile count and the page behind it start to disagree.
+  const limitClause = limit === null ? sql`` : sql`LIMIT ${limit}`;
+
   const result = await db.execute(sql`
     SELECT ${TILE_COLUMNS}
       FROM destinations d
@@ -102,9 +108,32 @@ export async function getTopLevelDestinations(
        AND d.parent_slug IS NULL
        AND c.n > 0
      ORDER BY c.n DESC, d.sort_order ASC, d.name ASC
-     LIMIT ${limit}
+     ${limitClause}
   `);
   return result.rows as DestinationTile[];
+}
+
+/**
+ * Total published, geocoded listings — the number the home page hero shows.
+ *
+ * It lives here rather than in the page for the same reason as everything
+ * else in this file: the hero's claim about inventory has to come from the
+ * inventory. "1433+" hardcoded into a component is audit finding D-01, and
+ * the only durable defence against it is that no component is in a
+ * position to invent the number.
+ *
+ * `geog IS NOT NULL` is part of the definition, not a filter bolted on: a
+ * listing with no coordinates cannot appear in any destination or in
+ * distance search, so counting it in the headline would overstate what a
+ * guest can actually find.
+ */
+export async function countPublishedListings(db: typeof Db): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT count(*)::int AS n
+      FROM listings
+     WHERE status = 'published' AND geog IS NOT NULL
+  `);
+  return (result.rows[0] as { n: number }).n;
 }
 
 /**

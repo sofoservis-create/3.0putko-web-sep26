@@ -76,7 +76,16 @@ pnpm run push                     # push schema directly (dev only)
 pnpm run verify:no-double-booking # the overlap-constraint proof (see below)
 pnpm run seed:destinations        # the "Obľúbené miesta" catalogue (idempotent)
 pnpm run verify:destinations      # tile counts == page results (see below)
+pnpm run seed:demo-listings       # 17 fictional listings, dev only
 pnpm exec tsx scripts/smoke-destination-queries.ts   # the exported query fns
+```
+
+Web app (`artifacts/web`, package `@workspace/web`):
+
+```sh
+cd artifacts/web
+pnpm run dev                      # http://localhost:3000
+pnpm run build && pnpm start
 ```
 
 Both verify scripts write fixtures inside a transaction they always roll
@@ -157,6 +166,12 @@ Two consequences worth knowing before editing:
   child can even sit outside its parent's circle (Donovaly does). Never
   render them as a breakdown.
 
+Known limitation, demonstrated: a circle cannot express a long valley.
+Zuberec (Orava) is 20.7 km from Liptov's centre while Východná (Liptov) is
+29.1 km, so no radius separates them — the fix is polygons for the valley
+regions, which changes only `MEMBERSHIP`. Asserted in the verify script so
+it stays visible. See `docs/DESTINATIONS.md`.
+
 The catalogue itself is editorial and lives in
 `lib/db/scripts/seed-destinations.mjs`, not in a migration — correcting a
 radius means editing the array and re-running (idempotent upsert). After any
@@ -183,6 +198,10 @@ the script instead of shipping.
 
 ### Layout
 
+- `artifacts/web/` — the Next.js 15 app (`@workspace/web`). Design tokens
+  live in `app/globals.css` and **no hex value belongs anywhere else** —
+  the current site accumulated ten near-identical greens exactly that way.
+  Two gotchas cost real time there; see Gotchas below.
 - `lib/db/` — Drizzle schema, migrations, queries (`@workspace/db`)
 - `lib/api-spec/`, `lib/api-zod/`, `lib/api-client-react/` — OpenAPI spec and
   Orval-generated clients/schemas
@@ -213,6 +232,21 @@ Each of these cost real debugging time. Don't rediscover them.
   aborts entirely after any error and rejects everything after it with
   `25P02`. Wrap each expected-to-fail assertion in `SAVEPOINT` /
   `ROLLBACK TO SAVEPOINT`.
+- **Tailwind v4 `@theme` tree-shakes.** It emits only the variables some
+  generated utility references, so a token used solely from hand-written
+  CSS or an arbitrary `var()` silently resolves to nothing — the build
+  stays clean and the page just looks slightly wrong. Use `@theme static`
+  for a token file, and prefer the generated utilities (`font-display`,
+  `text-ink`) over `text-[var(--color-ink)]`.
+- **next/font variables must go on `<html>`, not `<body>`.** A token like
+  `--font-display: var(--font-fraunces), serif` is declared at `:root`; if
+  `--font-fraunces` only exists on `<body>`, that substitution fails at
+  `:root`, the property becomes guaranteed-invalid, and every descendant
+  inherits the invalid value. Fonts load, build passes, nothing uses them.
+- **A verify script must not assume an empty table.** The destination
+  membership assertions passed only while `listings` was empty; the moment
+  demo data existed, eight of them were testing the database's contents
+  rather than the rule. Scope fixtures explicitly (`slug LIKE 'fx-%'`).
 - **`unaccent` is not IMMUTABLE** and cannot be indexed directly. Wrap it:
   `CREATE FUNCTION f_unaccent(text) ... IMMUTABLE ... $$ SELECT
   public.unaccent('public.unaccent', $1) $$;` then index on `f_unaccent(col)`.
