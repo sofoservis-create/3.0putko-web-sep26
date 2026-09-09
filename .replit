@@ -20,13 +20,28 @@ runButton = "Project"
 # bound to localhost the port is open and nothing can reach it.
 [[workflows.workflow]]
 name = "Project"
-mode = "sequential"
+mode = "parallel"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p 5000"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Putko Next Preview"
+
+[[workflows.workflow]]
+name = "Putko Next Preview"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "NEXT_TELEMETRY_DISABLED=1 pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p 5000"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000
