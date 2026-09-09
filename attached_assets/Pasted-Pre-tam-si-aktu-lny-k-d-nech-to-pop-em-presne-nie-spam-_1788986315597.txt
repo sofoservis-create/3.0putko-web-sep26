@@ -1,0 +1,114 @@
+Prečítam si aktuálny kód, nech to popíšem presne, nie spamäti.
+
+Tu je celá logika, od dát po obrazovku.
+
+## 1. Základná myšlienka
+
+Destinácia **nie je štítok**, ktorý niekto ubytovaniu pridelí. Je to **kruh na mape**.
+
+Každá destinácia má stredový bod a polomer. Ubytovanie do nej patrí vtedy a len vtedy, keď jeho súradnice padnú dovnútra toho kruhu. Žiadna spojovacia tabuľka, žiadne priraďovanie, žiadny admin krok.
+
+## 2. Čo je destinácia (tabuľka `destinations`)
+
+| Stĺpec | Načo |
+|---|---|
+| `slug` | primárny kľúč a zároveň URL — `/miesta/liptov` |
+| `name` | „Liptov" |
+| `kind` | `region` / `mountains` / `city` / `thermal` / `heritage` / `nature` |
+| `parent_slug` | vnorenie — Štrbské Pleso → Vysoké Tatry → Tatry |
+| **`centre`** | `geography(Point, 4326)` — stred kruhu |
+| **`radius_m`** | polomer v metroch |
+| `sort_order` | editoriálne poradie, **len na rozhodovanie zhody** |
+| `is_active` | vypnutie bez mazania |
+
+`centre` a `radius_m` sú tie dva, na ktorých stojí všetko ostatné. Zvyšok je popis.
+
+## 3. Pravidlo príslušnosti — jeden riadok
+
+```sql
+l.status = 'published'
+AND l.geog IS NOT NULL
+AND ST_DWithin(l.geog, d.centre, d.radius_m)
+```
+
+Toto je konštanta `MEMBERSHIP` v `lib/db/src/queries/destinations.ts`. **Existuje raz.** Interpoluje sa aj do dotazu, ktorý počíta číslo na dlaždici, aj do dotazu, ktorý vypisuje ubytovania na stránke destinácie.
+
+Preto platí:
+
+> **číslo na dlaždici == počet výsledkov, ktoré dostaneš po kliknutí**
+
+Nie preto, že si na to dávam pozor. Preto, že sú to **doslova tie isté podmienky**. Nedá sa zmeniť jedno bez druhého.
+
+Tri podmienky, každá má dôvod:
+- `status = 'published'` — koncept sa nedá rezervovať, takže by dlaždica sľubovala niečo, čo stránka neukáže
+- `geog IS NOT NULL` — bez súradníc nie je v žiadnom kruhu; keby sme ho počítali, číslo by klamalo
+- `ST_DWithin` — samotná geometria, v metroch, cez GiST indexy na oboch stranách
+
+## 4. Prečo kruh a nie priradenie
+
+**Nemôže zastarať.** Ubytovateľ zverejní chatu a tá sa objaví v správnych destináciách okamžite. Nikto nič netaguje, nič sa nedopĺňa spätne.
+
+**Prekryv je pravda, nie chyba.** Chata pri Štrbskom plese naozaj je vo Vysokých Tatrách, v Tatrách, na Spiši aj pri Poprade. Hosť, ktorý prehliada ktorúkoľvek zo štyroch, ju má nájsť.
+
+**Nepotrebuje okresy.** 79 okresov nie je naseedovaných (chcú reálne kódy ŠÚ SR) a toto ich nepotrebuje.
+
+## 5. Čo z toho vyplýva
+
+**Počty detí sa nesčítavajú do rodiča.** Dieťa má vlastný kruh, počíta si svoje. Donovaly dokonca ležia *mimo* kruhu Nízkych Tatier — `parent_slug` je **navigácia, nie geometria**. Preto sa deti nikdy nesmú vykresliť ako rozpis rodičovho čísla.
+
+**Prázdna destinácia sa nikdy nezobrazí.** Domovská mriežka filtruje `c.n > 0`. Nikdy neuvidíš dlaždicu „0 možností".
+
+**Editoriálne poradie nevie kúpiť pozíciu.** Radí sa `ORDER BY počet DESC, sort_order, name` — `sort_order` rozhoduje až zhodu medzi destináciami, ktoré už ubytovania majú.
+
+## 6. Šesť funkcií, ktoré to používajú
+
+| Funkcia | Kde |
+|---|---|
+| `getTopLevelDestinations(db, limit)` | domovská mriežka — len `parent_slug IS NULL`, len s počtom > 0 |
+| `countPublishedListings(db)` | číslo v hero — živý `COUNT(*)`, nie „1433+" |
+| `getChildDestinations(db, parent)` | zanorenie: Liptov → Bešeňová |
+| `getDestination(db, slug)` | hlavička `/miesta/[slug]` — bez filtra na počet, prázdna destinácia je legitímna stránka |
+| `getDestinationListings(db, slug)` | ubytovania, radené podľa vzdialenosti od stredu |
+| `getDestinationsForListing(db, id)` | omrvinky na detaile, od najužšej |
+
+## 7. Konkrétny príklad
+
+**Chalet Demänovská dolina**, súradnice `19.5883, 48.9694`.
+
+Postgres prejde 35 destinácií a spýta sa pri každej: *je tento bod bližšie ako polomer?*
+
+| Destinácia | Vzdialenosť | Polomer | Vnútri? |
+|---|---|---|---|
+| Jasná | 0 km | 9 km | áno |
+| Nízke Tatry | 3,6 km | 30 km | áno |
+| Liptov | 12,3 km | 30 km | áno |
+| Horehronie | 18,5 km | 18 km | **nie** |
+| Vysoké Tatry | 55 km | 15 km | nie |
+
+Výsledok: **Jasná · Nízke Tatry · Liptov**. Presne to sú omrvinky na detaile ubytovania.
+
+A naopak, `/miesta/liptov` spočíta všetky ubytovania vo svojom 30 km kruhu → **6** → to isté číslo je na dlaždici na domovskej stránke aj v nadpise stránky.
+
+## 8. Kde model narazí
+
+Horehronie vyššie **nedostalo** tú chatu — a to je zámerné. Pôvodne malo 25 km a kruh preliezal cez hrebeň Nízkych Tatier. Stiahol som ho na 18 km.
+
+Ale Liptov ukazuje **tvrdý strop**:
+
+| Miesto | Vzdialenosť od stredu Liptova | Región |
+|---|---|---|
+| Pribylina | 19,8 km | Liptov |
+| **Zuberec** | **20,7 km** | **Orava** |
+| Východná | 29,1 km | Liptov |
+
+Zuberec leží *medzi* dvoma liptovskými obcami. **Žiadny polomer ich neoddelí** — to je aritmetika, nie ladenie. Riešenie sú polygóny pre dolinové regióny, a keďže `MEMBERSHIP` je jeden fragment, zmení sa iba on: `ST_Covers` namiesto `ST_DWithin`. Žiadna routa, žiaden komponent.
+
+## 9. Ako sa katalóg mení
+
+Zoznam 35 destinácií **nie je v migrácii** — je to pole v `lib/db/scripts/seed-destinations.mjs`. Zmeníš polomer, pustíš `pnpm run seed:destinations` (idempotentný upsert) a `pnpm run verify:destinations`.
+
+Ten verify má **zoznam povolených prekryvov**: ak nejaká destinácia zasiahne stred inej a nie je to na zozname, test spadne. Chytilo to sedem reálnych chýb — Orava siahala 24 km na juh do Liptova, Veľká Fatra pohltila Banskú Bystricu, Malá Fatra aj Kysuce pohltili Žilinu, a ďalšie.
+
+---
+
+Ak by ti pomohlo vidieť tie kruhy na mape Slovenska — viem spraviť jednoduchú vizualizáciu, kde je vidno prekryvy aj ten problém so Zubercom. Povedz.
