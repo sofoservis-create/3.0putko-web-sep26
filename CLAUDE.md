@@ -72,7 +72,10 @@ cd lib/db
 pnpm run generate                 # generate a migration from the TS schema
 pnpm run generate -- --custom --name <name>   # empty migration for hand-written SQL
 pnpm run migrate                  # apply migrations
-pnpm run push                     # push schema directly (dev only)
+# NEVER `pnpm run push` on this project — drizzle-kit push diffs the TS
+# schema and would create every table WITHOUT listings.geog and
+# destinations.centre (both hand-written; see the PostGIS gotcha below).
+# The schema would look complete and every geographic query would fail.
 pnpm run verify:no-double-booking # the overlap-constraint proof (see below)
 pnpm run seed:destinations        # the "Obľúbené miesta" catalogue (idempotent)
 pnpm run verify:destinations      # tile counts == page results (see below)
@@ -238,7 +241,11 @@ message *or* in the timing. See `docs/ACCOUNTS.md`.
   on rather than replacing
 - `artifacts/putko/` — Vite/React app migrated from the original Next.js app
 - `.migration-backup/` — **reference only**, see above
+- `lib/auth/` — password + session primitives, the only copy (`@workspace/auth`)
 - `render.yaml` — Render Blueprint (`putko-db`, `putko-kv`, Frankfurt/EU)
+- `scripts/setup-db.sh` — empty Postgres → working database, idempotent.
+  Extensions first (0002 needs postgis + btree_gist), then `migrate`, then
+  seed. Verified end-to-end against a genuinely fresh database.
 
 ## Gotchas found the hard way
 

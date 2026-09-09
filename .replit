@@ -11,6 +11,27 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+# The Run button. Starts the new Next.js app (artifacts/web) — the browse
+# layer, the guest account and the host area. The older artifacts/putko Vite
+# app and artifacts/api-server are still in the repo but are not what this
+# runs; see replit.md.
+#
+# `next dev -H 0.0.0.0` because Replit proxies from outside the container:
+# bound to localhost the port is open and nothing can reach it.
+[[workflows.workflow]]
+name = "Project"
+mode = "sequential"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p 5000"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
