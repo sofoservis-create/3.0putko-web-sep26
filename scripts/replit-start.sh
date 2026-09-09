@@ -53,10 +53,14 @@ count=$(psql "$DATABASE_URL" -tAc \
 
 if [ "$count" = "missing" ] || [ "$count" = "0" ]; then
   echo "  database is empty — setting it up…"
+  # No catch-all guess about the cause. setup-db.sh prints the real Postgres
+  # error itself now; the previous version of this message blamed PostGIS for
+  # every failure and sent someone chasing a problem that did not exist —
+  # their extensions step had passed cleanly.
   bash scripts/setup-db.sh || {
-    bad "setup failed. If it says PostGIS is unavailable, this Postgres cannot"
-    echo "     run the app — use the Database tab to create a Replit PostgreSQL"
-    echo "     database, or point DATABASE_URL at the Render one (docs/DEPLOY.md)."
+    bad "Database setup failed — the reason is printed above."
+    echo
+    echo "     For the full picture:  bash scripts/diagnose-db.sh"
     exit 1
   }
 else

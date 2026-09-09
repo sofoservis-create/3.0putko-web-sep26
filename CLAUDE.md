@@ -71,7 +71,9 @@ Database (`lib/db`, package `@workspace/db`):
 cd lib/db
 pnpm run generate                 # generate a migration from the TS schema
 pnpm run generate -- --custom --name <name>   # empty migration for hand-written SQL
-pnpm run migrate                  # apply migrations
+pnpm run migrate                  # apply migrations (scripts/migrate.mjs)
+pnpm run migrate:drizzle-kit      # the drizzle-kit equivalent; same ledger
+bash ../../scripts/diagnose-db.sh # dump extensions, tables, migrations, columns
 # NEVER `pnpm run push` on this project — drizzle-kit push diffs the TS
 # schema and would create every table WITHOUT listings.geog and
 # destinations.centre (both hand-written; see the PostGIS gotcha below).
@@ -251,6 +253,14 @@ message *or* in the timing. See `docs/ACCOUNTS.md`.
 
 Each of these cost real debugging time. Don't rediscover them.
 
+- **`drizzle-kit migrate` swallows the Postgres error.** A failing migration
+  prints a spinner and exits 1 — no error code, no message, no filename, so
+  the visible output is just `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. That cost a
+  round of blaming PostGIS for a failure that was `42P07 relation already
+  exists`. `pnpm run migrate` is now `scripts/migrate.mjs`, which prints the
+  code, the message, the statement and the file. It is interchangeable with
+  drizzle-kit — same ledger table, `hash` = SHA-256 of the file, `created_at`
+  = the journal's `when`; verified in both directions.
 - **The build must work without `DATABASE_URL`.** `next build` imports every
   page to collect its config, so anything that throws at module import time
   kills the build on every host. `lib/db/src/index.ts` creates the pool AND

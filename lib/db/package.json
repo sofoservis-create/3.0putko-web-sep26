@@ -12,11 +12,12 @@
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "generate": "drizzle-kit generate --config ./drizzle.config.ts",
-    "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
+    "migrate": "node scripts/migrate.mjs",
     "seed:destinations": "node scripts/seed-destinations.mjs",
     "verify:no-double-booking": "node scripts/verify-exclusion-constraint.mjs",
     "verify:destinations": "node scripts/verify-destination-membership.mjs",
-    "seed:demo-listings": "node scripts/seed-demo-listings.mjs"
+    "seed:demo-listings": "node scripts/seed-demo-listings.mjs",
+    "migrate:drizzle-kit": "drizzle-kit migrate --config ./drizzle.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

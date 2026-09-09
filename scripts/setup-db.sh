@@ -7,14 +7,17 @@
 #   1. extensions  — migration 0002 creates a geography column and a GiST
 #                    exclusion constraint, so postgis and btree_gist have to
 #                    exist BEFORE it runs, not after.
-#   2. migrate     — drizzle-kit migrate, which walks the journal and applies
-#                    the hand-written SQL migrations too. NOT `drizzle-kit
-#                    push`: push diffs the TypeScript schema against the
-#                    database, and listings.geog / destinations.centre are
-#                    deliberately not in the TypeScript schema (drizzle-kit
-#                    cannot emit a PostGIS type modifier — see CLAUDE.md).
-#                    Push would therefore create every table WITHOUT those
-#                    columns and every destination query would fail.
+#   2. migrate     — lib/db/scripts/migrate.mjs, which walks the journal and
+#                    applies the hand-written SQL migrations too, and which
+#                    REPORTS THE POSTGRES ERROR when one fails. drizzle-kit
+#                    migrate swallows it: a failure there prints a spinner
+#                    and exits 1 with no code, no message and no filename.
+#                    The two are interchangeable — same ledger, same hashes.
+#                    NOT `drizzle-kit push`: push diffs the TypeScript schema,
+#                    and listings.geog / destinations.centre are deliberately
+#                    not in it (drizzle-kit cannot emit a PostGIS type
+#                    modifier — see CLAUDE.md), so push would create every
+#                    table WITHOUT them and every geographic query would fail.
 #   3. seed        — destinations are reference data the app needs; the demo
 #                    listings and accounts are development-only.
 set -euo pipefail
@@ -42,7 +45,26 @@ psql "$DATABASE_URL" -tAc "SELECT 1 FROM pg_extension WHERE extname='postgis'" |
 echo "    postgis, btree_gist, unaccent, pg_trgm ready"
 
 echo "==> 2/3  Migrations"
-pnpm --filter @workspace/db run migrate
+# Capture rather than stream. drizzle-kit prints a spinner and then pnpm's
+# "Exit status 1" replaces the actual Postgres error, so a failure here
+# arrives as "migrate failed" with no reason — which is exactly what
+# happened on the first real Replit run, and sent the user chasing a PostGIS
+# problem that did not exist.
+migrate_log=$(mktemp)
+if ! pnpm --filter @workspace/db run migrate > "$migrate_log" 2>&1; then
+  echo
+  echo "    Migrations FAILED. The real error follows:" >&2
+  echo "    ----------------------------------------" >&2
+  sed 's/^/    /' "$migrate_log" >&2
+  echo "    ----------------------------------------" >&2
+  echo >&2
+  echo "    For a full picture of the database, run:" >&2
+  echo "      bash scripts/diagnose-db.sh" >&2
+  rm -f "$migrate_log"
+  exit 1
+fi
+rm -f "$migrate_log"
+echo "    applied"
 
 echo "==> 3/3  Seed"
 pnpm --filter @workspace/db run seed:destinations
