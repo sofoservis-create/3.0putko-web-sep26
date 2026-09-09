@@ -77,13 +77,10 @@ const Login = () => {
       let res = null;
       if (TestGuestAuth_URL) {
         try {
-          const testGuestResponse = await fetch(
+          res = await fetch(
             `${TestGuestAuth_URL}/test-auth/login`,
             requestOptions
           );
-          if (testGuestResponse.status !== 404) {
-            res = testGuestResponse;
-          }
         } catch {
           // Keep host login available if the development-only API is offline.
         }
@@ -94,12 +91,26 @@ const Login = () => {
       }
 
       if (!res.ok) {
-        const errorResponse = await res.json();
+        const contentType = res.headers.get("content-type") || "";
+        const errorResponse = contentType.includes("application/json")
+          ? await res.json()
+          : null;
         throw new Error(
-          errorResponse.message || ""
-        ); // Use the error message from the backend
+          errorResponse?.message ||
+            (language === "en"
+              ? "Sign in is temporarily unavailable."
+              : "Prihlásenie je momentálne nedostupné.")
+        );
       }
 
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            language === "en"
+              ? "The sign-in service returned an invalid response."
+              : "Prihlasovacia služba vrátila neplatnú odpoveď."
+          );
+        }
         const result = await res.json();
         const authPayload = result.data?.user ? result.data : result;
         const authUser = authPayload.user || result.data;
