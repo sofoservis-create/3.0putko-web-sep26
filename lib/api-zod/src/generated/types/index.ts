@@ -7,7 +7,16 @@
  */
 
 export * from './authMessage';
+export * from './destination';
+export * from './destinationCatalogResponse';
+export * from './destinationCenter';
+export * from './destinationSearchResponse';
+export * from './destinationSearchResponseAccommodationsItem';
+export * from './destinationSummary';
+export * from './destinationType';
 export * from './healthStatus';
+export * from './popularDestinationsResponse';
+export * from './popularDestinationsResponseSource';
 export * from './testGuest';
 export * from './testGuestActiveMode';
 export * from './testGuestCapabilitiesItem';

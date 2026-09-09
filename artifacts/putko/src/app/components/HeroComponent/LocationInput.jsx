@@ -10,7 +10,9 @@ import {
   getCanonicalCityMatch,
   loadCanonicalCities,
   mergeCanonicalCitySuggestion,
+  mergeDestinationSuggestions,
   resolveCanonicalCity,
+  selectDestination,
 } from "../../utils/searchNormalization";
  
 const LocationInput = ({
@@ -163,7 +165,7 @@ const LocationInput = ({
   const fetchSuggestions = async (input) => {
     // Show default locations if empty
     if (!input) {
-      setSuggestions(commonLocations);
+      setSuggestions(await mergeDestinationSuggestions("", commonLocations));
       setLoading(false);
       return;
     }
@@ -203,7 +205,11 @@ const LocationInput = ({
 
       // Fetch Google Places suggestions
       const googlePromise = (async () => {
-        await loadGoogleMapsScript();
+        try {
+          await loadGoogleMapsScript();
+        } catch {
+          return [];
+        }
         return new Promise((resolve) => {
           const service = new window.google.maps.places.AutocompleteService();
           service.getPlacePredictions(
@@ -235,9 +241,10 @@ const LocationInput = ({
         googlePromise,
       ]);
 
-      setSuggestions(
+      setSuggestions(await mergeDestinationSuggestions(
+        input,
         mergeCanonicalCitySuggestion(input, [...accommodationResults, ...locationResults])
-      );
+      ));
       setLoading(false);
     } catch (error) {
       console.error("Error fetching suggestions:", error);
@@ -253,6 +260,7 @@ const LocationInput = ({
 
     localStorage.removeItem("selectedCity");
     localStorage.removeItem("selectedAccommodation");
+    localStorage.removeItem("selectedDestination");
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -265,16 +273,20 @@ const LocationInput = ({
     setShowPopover(false);
 
     if (item.type === "location") {
+      localStorage.removeItem("selectedDestination");
       const cityName = resolveCanonicalCity(item.description);
       localStorage.setItem("selectedCity", cityName);
       localStorage.removeItem("selectedAccommodation");
       updateCity?.(cityName);
       updateAccommodationName?.("");
     } else if (item.type === "accommodation") {
+      localStorage.removeItem("selectedDestination");
       localStorage.setItem("selectedAccommodation", item.description);
       localStorage.removeItem("selectedCity");
       updateAccommodationName?.(item.description);
       updateCity?.("");
+    } else if (selectDestination(item, updateCity, updateAccommodationName)) {
+      // Shared catalog selection uses its stable destination identifier.
     }
   };
 
@@ -381,6 +393,7 @@ const LocationInput = ({
                 setSuggestions(commonLocations); // reset to defaults on clear
                 localStorage.removeItem("selectedCity");
                 localStorage.removeItem("selectedAccommodation");
+                localStorage.removeItem("selectedDestination");
                 
               }}
               className="absolute z-10 flex items-center justify-center w-5 h-5 text-sm transform -translate-y-1/2 rounded-full bg-neutral-200 right-3 sm:right-4 top-1/2 text-neutral-500 hover:bg-neutral-300 hover:text-neutral-700 transition-colors shrink-0"

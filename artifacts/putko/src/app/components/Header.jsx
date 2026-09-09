@@ -12,7 +12,9 @@ import {
   getCanonicalCityMatch,
   loadCanonicalCities,
   mergeCanonicalCitySuggestion,
+  mergeDestinationSuggestions,
   resolveCanonicalCity,
+  selectDestination,
 } from "../utils/searchNormalization";
 
 const Header = () => {
@@ -159,7 +161,7 @@ const Header = () => {
     });
 
   const fetchSuggestions = async (input) => {
-    if (!input) { setSuggestions(commonLocations); setLoading(false); return; }
+    if (!input) { setSuggestions(await mergeDestinationSuggestions("", commonLocations)); setLoading(false); return; }
     setLoading(true);
     try {
       const base = (import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api");
@@ -180,7 +182,11 @@ const Header = () => {
           } catch { return []; }
         })(),
         (async () => {
-          await loadGoogleMaps();
+          try {
+            await loadGoogleMaps();
+          } catch {
+            return [];
+          }
           return new Promise((resolve) => {
             const svc = new window.google.maps.places.AutocompleteService();
             svc.getPlacePredictions({ input: suggestionQuery, types: ["(cities)"], componentRestrictions: { country: "sk" } }, (preds, status) => {
@@ -191,7 +197,7 @@ const Header = () => {
           });
         })(),
       ]);
-      setSuggestions(mergeCanonicalCitySuggestion(input, [...accResults, ...googleResults]));
+      setSuggestions(await mergeDestinationSuggestions(input, mergeCanonicalCitySuggestion(input, [...accResults, ...googleResults])));
     } catch { setSuggestions([]); }
     setLoading(false);
   };
@@ -201,6 +207,7 @@ const Header = () => {
     setStickyDestination(v);
     localStorage.removeItem("selectedCity");
     localStorage.removeItem("selectedAccommodation");
+    localStorage.removeItem("selectedDestination");
     if (updateAccommodationName) updateAccommodationName("");
     if (updateCity) updateCity("");
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -211,17 +218,19 @@ const Header = () => {
     setStickyDestination(item.description);
     setShowDropdown(false);
     if (item.type === "location") {
+      localStorage.removeItem("selectedDestination");
       const c = resolveCanonicalCity(item.description);
       localStorage.setItem("selectedCity", c);
       localStorage.removeItem("selectedAccommodation");
       if (updateAccommodationName) updateAccommodationName("");
       if (updateCity) updateCity(c);
-    } else {
+    } else if (item.type === "accommodation") {
+      localStorage.removeItem("selectedDestination");
       localStorage.setItem("selectedAccommodation", item.description);
       localStorage.removeItem("selectedCity");
       if (updateCity) updateCity("");
       if (updateAccommodationName) updateAccommodationName(item.description);
-    }
+    } else selectDestination(item, updateCity, updateAccommodationName);
   };
 
   const handleStickySearch = async (e) => {
@@ -361,6 +370,7 @@ const Header = () => {
                     setStickyDestination("");
                     localStorage.removeItem("selectedCity");
                     localStorage.removeItem("selectedAccommodation");
+                    localStorage.removeItem("selectedDestination");
                     if (updateAccommodationName) updateAccommodationName("");
                     if (updateCity) updateCity("");
                     setSuggestions(commonLocations);

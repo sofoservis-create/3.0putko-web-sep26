@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useRouter } from "@/app/components/NextNavigation";
 import { FormContext } from "../FormContext";
 import Link from "@/app/components/NextLink";
@@ -13,21 +13,9 @@ import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import CardCategorySlider from "./CardCategorySlider";
 import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
-import { createSearchKey, resolveCanonicalCity } from "../utils/searchNormalization";
-
-const DEMO_CATS = [
-  { id: "1", name: "Bratislava", taxonomy: "category", count: 0, thumbnail: "/bratislava.avif" },
-  { id: "2", name: "Košice", taxonomy: "category", count: 0, thumbnail: "/kosice.avif" },
-  { id: "3", name: "Banská Bystrica", taxonomy: "category", count: 0, thumbnail: "/Banska_Bystrica.avif" },
-  { id: "4", name: "Trenčín", taxonomy: "category", count: 0, thumbnail: "/trencin.avif" },
-  { id: "5", name: "Žilina", taxonomy: "category", count: 0, thumbnail: "/zilina.avif" },
-  { id: "6", name: "Prešov", taxonomy: "category", count: 0, thumbnail: "/presov.avif" },
-  { id: "7", name: "Trnava", taxonomy: "category", count: 0, thumbnail: "/trnava.avif" },
-  { id: "8", name: "Nitra", taxonomy: "category", count: 0, thumbnail: "/nitra.avif" },
-];
+import { resolveCanonicalCity } from "../utils/searchNormalization";
 
 const SectionGridCategoryBox = ({
-  categories = DEMO_CATS,
   className = "",
 }) => {
   const {
@@ -39,34 +27,20 @@ const SectionGridCategoryBox = ({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: cityCounts } = useFetchData(
-    `${(import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api")}/accommodation/counts-by-city`
-  );
+  const { data, loading, error } = useFetchData("/api/destinations");
+  const destinations = Array.isArray(data?.destinations) ? data.destinations : [];
 
-  const sortedCategories = useMemo(() => {
-    return categories
-      .map((item) => {
-        const cityCount = Array.isArray(cityCounts)
-          ? cityCounts.find((entry) => createSearchKey(entry.city) === createSearchKey(item.name))?.count || 0
-          : 0;
-        return { ...item, count: cityCount };
-      })
-      .sort((a, b) => b.count - a.count);
-  }, [categories, cityCounts]);
-
-  const handleCardClick = async (cityName) => {
+  const handleCardClick = async (destination) => {
     if (isLoading) return;
     setIsLoading(true);
     try {
-      updatestartdate(""); updatendate(""); updateperson("");
-      updateAdults(0); updateChildren(0); updateInfants(0); updateAccommodationName("");
+      updateAccommodationName("");
+      localStorage.removeItem("selectedAccommodation");
 
-      const keysToRemove = ["checkin", "checkout", "guestValues", "guestAdults", "guestChildren", "guestInfants", "selectedAccommodation"];
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-
-      const canonicalCity = resolveCanonicalCity(cityName);
+      const canonicalCity = resolveCanonicalCity(destination.nameSk);
       updateCity(canonicalCity);
       localStorage.setItem("selectedCity", canonicalCity);
+      localStorage.setItem("selectedDestination", destination.id);
       router.push(`/listing-stay-map`);
     } catch (error) {
       console.error("Error:", error);
@@ -83,7 +57,12 @@ const SectionGridCategoryBox = ({
   }, [lang]);
 
   const t = translations[language];
-  const headingText = t.Populardestinations || "Populárne destinácie";
+  const headingText = t.PopularDestinations_Title || "Obľúbené destinácie";
+  const clearDestination = () => {
+    localStorage.removeItem("selectedDestination");
+    localStorage.removeItem("selectedCity");
+    updateCity("");
+  };
 
   return (
     <div className={`nc-SectionGridCategoryBox relative py-12 lg:py-20 container mx-auto px-4 max-w-7xl ${className}`}>
@@ -94,20 +73,23 @@ const SectionGridCategoryBox = ({
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] leading-tight">
             {headingText}
           </h2>
+          <p className="mt-3 text-base text-[#64776F]">
+            {t.PopularDestinations_Subtitle || "Objavte miesta s aktuálne dostupnými pobytmi."}
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
-          <Link href="/listing-stay-map" className="hidden sm:flex items-center text-[#238869] font-inter font-semibold hover:text-[#1A3A2E] transition-colors">
+          <Link href="/listing-stay-map" onClick={clearDestination} className="hidden sm:flex items-center text-[#238869] font-inter font-semibold hover:text-[#1A3A2E] transition-colors">
             {t.Viewall || "Zobraziť všetky"}
             <ArrowRightIcon className="w-4 h-4 ml-1.5" />
           </Link>
 
           {/* Custom Navigation */}
           <div className="hidden sm:flex items-center gap-2">
-            <button className="prev-btn w-12 h-12 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 transition-colors text-neutral-600 disabled:opacity-50">
+            <button aria-label={language === "en" ? "Previous destinations" : "Predchádzajúce destinácie"} className="prev-btn w-12 h-12 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 transition-colors text-neutral-600 disabled:opacity-50">
               <ChevronLeftIcon className="w-5 h-5" />
             </button>
-            <button className="next-btn w-12 h-12 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 transition-colors text-neutral-600 disabled:opacity-50">
+            <button aria-label={language === "en" ? "Next destinations" : "Ďalšie destinácie"} className="next-btn w-12 h-12 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 transition-colors text-neutral-600 disabled:opacity-50">
               <ChevronRightIcon className="w-5 h-5" />
             </button>
           </div>
@@ -115,7 +97,25 @@ const SectionGridCategoryBox = ({
       </div>
 
       {/* Slider */}
-      <div className="relative group">
+      <div className="relative group min-h-[280px] sm:min-h-[330px]" aria-live="polite">
+        {loading && (
+          <div className="flex gap-4 overflow-hidden">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="h-[300px] min-w-[78%] animate-pulse rounded-2xl bg-neutral-200 sm:min-w-[44%] lg:min-w-[23%]" />
+            ))}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-[#F3F7F5] px-6 text-center text-[#4A5D54]">
+            {t.PopularDestinations_Error || "Destinácie sa momentálne nepodarilo načítať."}
+          </div>
+        )}
+        {!loading && !error && destinations.length === 0 && (
+          <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-[#F3F7F5] px-6 text-center text-[#4A5D54]">
+            {t.PopularDestinations_Empty || "Momentálne nie sú dostupné žiadne destinácie."}
+          </div>
+        )}
+        {!loading && !error && destinations.length > 0 && (
         <Swiper
           modules={[Navigation]}
           navigation={{
@@ -123,7 +123,7 @@ const SectionGridCategoryBox = ({
             nextEl: ".next-btn",
           }}
           spaceBetween={16}
-          slidesPerView={1.2}
+          slidesPerView={1.22}
           loop={false}
           breakpoints={{
             480: { slidesPerView: 2.2, spaceBetween: 16 },
@@ -132,20 +132,25 @@ const SectionGridCategoryBox = ({
           }}
           className="!pb-6"
         >
-          {sortedCategories.map((item) => (
+          {destinations.map((item) => (
             <SwiperSlide key={item.id}>
               <CardCategorySlider
-                taxonomy={item}
-                onClick={() => handleCardClick(item.name)}
+                taxonomy={{
+                  ...item,
+                  name: language === "en" ? item.nameEn : item.nameSk,
+                  thumbnail: item.image,
+                }}
+                onClick={() => handleCardClick(item)}
               />
             </SwiperSlide>
           ))}
         </Swiper>
+        )}
       </div>
 
       {/* Mobile View All */}
       <div className="mt-4 flex justify-center sm:hidden">
-        <Link href="/listing-stay-map" className="flex items-center justify-center w-full py-3 px-6 rounded-xl border border-neutral-200 text-[#1A3A2E] font-inter font-semibold hover:bg-neutral-50 active:bg-neutral-100 transition-colors">
+        <Link href="/listing-stay-map" onClick={clearDestination} className="flex items-center justify-center w-full py-3 px-6 rounded-xl border border-neutral-200 text-[#1A3A2E] font-inter font-semibold hover:bg-neutral-50 active:bg-neutral-100 transition-colors">
           {t.Viewall || "Zobraziť všetky"}
         </Link>
       </div>

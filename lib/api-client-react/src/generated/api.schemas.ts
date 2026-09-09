@@ -5,6 +5,75 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface DestinationCenter {
+  latitude: number;
+  longitude: number;
+}
+
+export type DestinationType = typeof DestinationType[keyof typeof DestinationType];
+
+
+export const DestinationType = {
+  city: 'city',
+  region: 'region',
+  mountains: 'mountains',
+  nature: 'nature',
+  spa: 'spa',
+  landmark: 'landmark',
+} as const;
+
+export interface Destination {
+  id: string;
+  slug: string;
+  nameSk: string;
+  nameEn: string;
+  type: DestinationType;
+  /** @nullable */
+  parentId: string | null;
+  editorialOrder: number;
+  center: DestinationCenter;
+  radiusKm: number;
+  /** @nullable */
+  image: string | null;
+}
+
+export type DestinationSummary = Destination & {
+  /** @minimum 1 */
+  count: number;
+};
+
+export interface DestinationCatalogResponse {
+  version: number;
+  /**
+     * @minItems 35
+     * @maxItems 35
+     */
+  destinations: Destination[];
+}
+
+export type PopularDestinationsResponseSource = typeof PopularDestinationsResponseSource[keyof typeof PopularDestinationsResponseSource];
+
+
+export const PopularDestinationsResponseSource = {
+  'legacy-public-accommodations': 'legacy-public-accommodations',
+} as const;
+
+export interface PopularDestinationsResponse {
+  version: number;
+  source: PopularDestinationsResponseSource;
+  destinations: DestinationSummary[];
+}
+
+export type DestinationSearchResponseAccommodationsItem = { [key: string]: unknown };
+
+export interface DestinationSearchResponse {
+  destinationId: string;
+  accommodations: DestinationSearchResponseAccommodationsItem[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+}
+
 export interface HealthStatus {
   status: string;
 }

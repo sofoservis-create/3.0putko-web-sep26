@@ -21,7 +21,10 @@ import type {
 
 import type {
   AuthMessage,
+  DestinationCatalogResponse,
+  DestinationSearchResponse,
   HealthStatus,
+  PopularDestinationsResponse,
   TestGuest,
   TestGuestFavoriteInput,
   TestGuestFavorites,
@@ -127,6 +130,237 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDestinationCatalogUrl = () => {
+
+
+
+
+  return `/api/destinations/catalog`
+}
+
+/**
+ * @summary Get the complete editorial destination catalog
+ */
+export const getDestinationCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<DestinationCatalogResponse> => {
+
+  return customFetch<DestinationCatalogResponse>(getGetDestinationCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDestinationCatalogQueryKey = () => {
+    return [
+    `/api/destinations/catalog`
+    ] as const;
+    }
+
+
+export const getGetDestinationCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getDestinationCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDestinationCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDestinationCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDestinationCatalog>>> = ({ signal }) => getDestinationCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDestinationCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDestinationCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getDestinationCatalog>>>
+export type GetDestinationCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the complete editorial destination catalog
+ */
+
+export function useGetDestinationCatalog<TData = Awaited<ReturnType<typeof getDestinationCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDestinationCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDestinationCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPopularDestinationsUrl = () => {
+
+
+
+
+  return `/api/destinations`
+}
+
+/**
+ * @summary Get destinations with live public accommodation counts
+ */
+export const getPopularDestinations = async ( options?: Parameters<typeof customFetch>[1]): Promise<PopularDestinationsResponse> => {
+
+  return customFetch<PopularDestinationsResponse>(getGetPopularDestinationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPopularDestinationsQueryKey = () => {
+    return [
+    `/api/destinations`
+    ] as const;
+    }
+
+
+export const getGetPopularDestinationsQueryOptions = <TData = Awaited<ReturnType<typeof getPopularDestinations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPopularDestinations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPopularDestinationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPopularDestinations>>> = ({ signal }) => getPopularDestinations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPopularDestinations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPopularDestinationsQueryResult = NonNullable<Awaited<ReturnType<typeof getPopularDestinations>>>
+export type GetPopularDestinationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get destinations with live public accommodation counts
+ */
+
+export function useGetPopularDestinations<TData = Awaited<ReturnType<typeof getPopularDestinations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPopularDestinations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPopularDestinationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDestinationResultsUrl = (slug: string,) => {
+
+
+
+
+  return `/api/destinations/${slug}/accommodations`
+}
+
+/**
+ * @summary Search public accommodations using the same membership rule as destination counts
+ */
+export const getDestinationResults = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<DestinationSearchResponse> => {
+
+  return customFetch<DestinationSearchResponse>(getGetDestinationResultsUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDestinationResultsQueryKey = (slug: string,) => {
+    return [
+    `/api/destinations/${slug}/accommodations`
+    ] as const;
+    }
+
+
+export const getGetDestinationResultsQueryOptions = <TData = Awaited<ReturnType<typeof getDestinationResults>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDestinationResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDestinationResultsQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDestinationResults>>> = ({ signal }) => getDestinationResults(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDestinationResults>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDestinationResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getDestinationResults>>>
+export type GetDestinationResultsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search public accommodations using the same membership rule as destination counts
+ */
+
+export function useGetDestinationResults<TData = Awaited<ReturnType<typeof getDestinationResults>>, TError = ErrorType<void>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDestinationResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDestinationResultsQueryOptions(slug,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

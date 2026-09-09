@@ -104,6 +104,10 @@ const en = {
   Location: "Location",
   Whereareyougoing: "WHERE ARE YOU GOING?",
   Whereareyougoin: "Where are you going?", 
+  PopularDestinations_Title: "Popular destinations",
+  PopularDestinations_Subtitle: "Explore cities, mountains, spas and natural places with stays available now.",
+  PopularDestinations_Error: "Destinations are temporarily unavailable.",
+  PopularDestinations_Empty: "There are no destinations available right now.",
   
   Adddates: "Dates",
   Checkin: "Check in",

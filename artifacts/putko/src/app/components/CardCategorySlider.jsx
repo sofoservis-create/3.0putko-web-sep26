@@ -1,6 +1,5 @@
 "use client";
 import React, { useContext, useEffect, useState } from "react";
-import Image from "@/app/components/NextImage";
 import en from "../locales/en";
 import sk from "../locales/sk";
 import { FormContext } from "../FormContext";
@@ -22,19 +21,14 @@ const CardCategorySlider = ({
   const { count, name, thumbnail } = taxonomy;
   
   return (
-    <div
+    <button
+      type="button"
+      aria-label={`${name}, ${count} ${t.properties || "ubytovaní"}`}
       onClick={onClick}
       className={`nc-CardCategorySlider relative flex flex-col w-full aspect-[4/5] rounded-2xl overflow-hidden group cursor-pointer ${className}`}
     >
-      <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-105">
-        <Image
-          src={thumbnail || "/fallback.jpg"}
-          alt={name}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          quality={75}
-          className="object-cover"
-        />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#1A3A2E] via-[#238869] to-[#8BC9B5] transition-transform duration-700 group-hover:scale-105">
+        {thumbnail && <img src={thumbnail} alt="" className="h-full w-full object-cover" />}
       </div>
       
       {/* Gradient Overlay */}
@@ -52,7 +46,7 @@ const CardCategorySlider = ({
           }
         </span>
       </div>
-    </div>
+    </button>
   );
 };
 

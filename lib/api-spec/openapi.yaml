@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: test-auth
     description: Development-only Putko guest authentication
+  - name: destinations
+    description: Editorial destinations backed by current public accommodations
 paths:
   /healthz:
     get:
@@ -26,6 +28,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /destinations/catalog:
+    get:
+      operationId: getDestinationCatalog
+      tags: [destinations]
+      summary: Get the complete editorial destination catalog
+      responses:
+        "200":
+          description: Complete destination catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationCatalogResponse"
+  /destinations:
+    get:
+      operationId: getPopularDestinations
+      tags: [destinations]
+      summary: Get destinations with live public accommodation counts
+      responses:
+        "200":
+          description: Non-empty destinations sorted by count and editorial order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopularDestinationsResponse"
+  /destinations/{slug}/accommodations:
+    get:
+      operationId: getDestinationResults
+      tags: [destinations]
+      summary: Search public accommodations using the same membership rule as destination counts
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching public accommodations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationSearchResponse"
+        "404":
+          description: Unknown destination
   /test-auth/register:
     post:
       operationId: registerTestGuest
@@ -309,6 +355,90 @@ paths:
                 $ref: "#/components/schemas/TestGuestFavorites"
 components:
   schemas:
+    DestinationCenter:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+    Destination:
+      type: object
+      required: [id, slug, nameSk, nameEn, type, parentId, editorialOrder, center, radiusKm, image]
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        nameSk:
+          type: string
+        nameEn:
+          type: string
+        type:
+          type: string
+          enum: [city, region, mountains, nature, spa, landmark]
+        parentId:
+          type: [string, "null"]
+        editorialOrder:
+          type: number
+        center:
+          $ref: "#/components/schemas/DestinationCenter"
+        radiusKm:
+          type: number
+        image:
+          type: [string, "null"]
+    DestinationSummary:
+      allOf:
+        - $ref: "#/components/schemas/Destination"
+        - type: object
+          required: [count]
+          properties:
+            count:
+              type: number
+              minimum: 1
+    DestinationCatalogResponse:
+      type: object
+      required: [version, destinations]
+      properties:
+        version:
+          type: number
+        destinations:
+          type: array
+          minItems: 35
+          maxItems: 35
+          items:
+            $ref: "#/components/schemas/Destination"
+    PopularDestinationsResponse:
+      type: object
+      required: [version, source, destinations]
+      properties:
+        version:
+          type: number
+        source:
+          type: string
+          enum: [legacy-public-accommodations]
+        destinations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DestinationSummary"
+    DestinationSearchResponse:
+      type: object
+      required: [destinationId, accommodations, totalCount, totalPages, currentPage]
+      properties:
+        destinationId:
+          type: string
+        accommodations:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        totalCount:
+          type: number
+        totalPages:
+          type: number
+        currentPage:
+          type: number
     HealthStatus:
       type: object
       properties:

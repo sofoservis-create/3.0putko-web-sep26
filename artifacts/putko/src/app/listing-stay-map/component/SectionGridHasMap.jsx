@@ -187,6 +187,7 @@ const SectionGridHasMap = () => {
 
   const searchParams = useSearchParams();
   const title = searchParams.get("title");
+  const [destinationSlug, setDestinationSlug] = useState("");
 
   const mapApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "").trim();
   const hasMapApiKey = Boolean(mapApiKey);
@@ -258,6 +259,7 @@ const SectionGridHasMap = () => {
   }, [commonParameters, sortOption]);
 
   useEffect(() => {
+    setDestinationSlug(localStorage.getItem("selectedDestination") || "");
     if (title) {
       updateCity(resolveCanonicalCity(title));
       setCityReady(true);
@@ -268,13 +270,17 @@ const SectionGridHasMap = () => {
 
   const { data: searchResponse, loading, error } = useFetchData(
     cityReady
-      ? `${(import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api")}/accommodations/searching?${paginatedParams}`
+      ? destinationSlug
+        ? `/api/destinations/${encodeURIComponent(destinationSlug)}/accommodations?${paginatedParams}`
+        : `${(import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api")}/accommodations/searching?${paginatedParams}`
       : null
   );
 
   const { data: pinsResponse } = useFetchData(
     cityReady
-      ? `${(import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api")}/accommodations/searching?${mapParams}`
+      ? destinationSlug
+        ? `/api/destinations/${encodeURIComponent(destinationSlug)}/accommodations?${mapParams}`
+        : `${(import.meta.env.VITE_API_URL || "https://backend-9k3q.onrender.com/api")}/accommodations/searching?${mapParams}`
       : null
   );
 
@@ -386,13 +392,9 @@ const SectionGridHasMap = () => {
         }),
       }).catch((err) => console.error("Error sending Search CAPI:", err));
 
-      const validListings = sortedListings.filter(
-        (acc) =>
-          isValidLatitude(acc?.location?.latitude) &&
-          isValidLongitude(acc?.location?.longitude)
-      );
-
-      setStayListings(validListings);
+      // Cards do not require map coordinates. Keep every matching public stay
+      // in the result list; the independent map response filters invalid pins.
+      setStayListings(sortedListings);
       updateacclen(totalAvailable);
       const timer = setTimeout(() => setShowLoading(false), 0);
       return () => clearTimeout(timer);

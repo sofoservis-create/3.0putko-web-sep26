@@ -18,6 +18,79 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get the complete editorial destination catalog
+ */
+export const getDestinationCatalogResponseDestinationsMin = 35;
+export const getDestinationCatalogResponseDestinationsMax = 35;
+
+
+
+export const GetDestinationCatalogResponse = zod.object({
+  "version": zod.number(),
+  "destinations": zod.array(zod.object({
+  "id": zod.string(),
+  "slug": zod.string(),
+  "nameSk": zod.string(),
+  "nameEn": zod.string(),
+  "type": zod.enum(['city', 'region', 'mountains', 'nature', 'spa', 'landmark']),
+  "parentId": zod.string().nullable(),
+  "editorialOrder": zod.number(),
+  "center": zod.object({
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}),
+  "radiusKm": zod.number(),
+  "image": zod.string().nullable()
+})).min(getDestinationCatalogResponseDestinationsMin).max(getDestinationCatalogResponseDestinationsMax)
+})
+
+
+/**
+ * @summary Get destinations with live public accommodation counts
+ */
+
+
+
+export const GetPopularDestinationsResponse = zod.object({
+  "version": zod.number(),
+  "source": zod.enum(['legacy-public-accommodations']),
+  "destinations": zod.array(zod.object({
+  "id": zod.string(),
+  "slug": zod.string(),
+  "nameSk": zod.string(),
+  "nameEn": zod.string(),
+  "type": zod.enum(['city', 'region', 'mountains', 'nature', 'spa', 'landmark']),
+  "parentId": zod.string().nullable(),
+  "editorialOrder": zod.number(),
+  "center": zod.object({
+  "latitude": zod.number(),
+  "longitude": zod.number()
+}),
+  "radiusKm": zod.number(),
+  "image": zod.string().nullable()
+}).and(zod.object({
+  "count": zod.number().min(1)
+})))
+})
+
+
+/**
+ * @summary Search public accommodations using the same membership rule as destination counts
+ */
+export const GetDestinationResultsParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const GetDestinationResultsResponse = zod.object({
+  "destinationId": zod.string(),
+  "accommodations": zod.array(zod.record(zod.string(), zod.unknown())),
+  "totalCount": zod.number(),
+  "totalPages": zod.number(),
+  "currentPage": zod.number()
+})
+
+
+/**
  * @summary Register a development-only guest
  */
 

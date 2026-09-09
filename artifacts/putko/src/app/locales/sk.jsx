@@ -103,6 +103,10 @@ const sk = {
   Location: "Miesto",
   Whereareyougoing: "Kam sa chystáte?",
   Whereareyougoin: "Kam sa chystáte?", 
+  PopularDestinations_Title: "Obľúbené destinácie",
+  PopularDestinations_Subtitle: "Objavte mestá, hory, kúpele a prírodné lokality s aktuálne dostupnými pobytmi.",
+  PopularDestinations_Error: "Destinácie sa momentálne nepodarilo načítať.",
+  PopularDestinations_Empty: "Momentálne nie sú dostupné žiadne destinácie.",
    
   Adddates: "Vyberte termín",
   Checkin: "Príchod",

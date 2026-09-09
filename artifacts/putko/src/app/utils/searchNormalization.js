@@ -1,5 +1,7 @@
 const canonicalCitiesByKey = new Map();
 let canonicalCitiesRequest = null;
+let destinationCatalogRequest = null;
+let destinationCatalog = [];
 const fallbackCanonicalCities = [
   "Banská Bystrica",
   "Košice",
@@ -120,4 +122,57 @@ export const mergeCanonicalCitySuggestion = (value, suggestions) => {
         },
         ...suggestions,
       ];
+};
+
+export const loadDestinationCatalog = async () => {
+  if (destinationCatalog.length === 35) return destinationCatalog;
+  if (!destinationCatalogRequest) {
+    destinationCatalogRequest = fetch("/api/destinations/catalog")
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((body) => {
+        destinationCatalog = Array.isArray(body.destinations) ? body.destinations : [];
+        registerCanonicalCities(destinationCatalog.map((item) => item.nameSk));
+        return destinationCatalog;
+      })
+      .catch((error) => {
+        destinationCatalogRequest = null;
+        console.error("Error loading destination catalog:", error);
+        return [];
+      });
+  }
+  return destinationCatalogRequest;
+};
+
+export const mergeDestinationSuggestions = async (value, suggestions) => {
+  const catalog = await loadDestinationCatalog();
+  const key = createSearchKey(value);
+  const catalogSuggestions = catalog
+    .filter((item) => !key || createSearchKey(item.nameSk).includes(key))
+    .map((item) => ({
+      type: "destination",
+      id: `destination-${item.id}`,
+      destinationId: item.id,
+      description: item.nameSk,
+    }));
+  const seen = new Set(catalogSuggestions.map((item) => createSearchKey(item.description)));
+  return [
+    ...catalogSuggestions,
+    ...suggestions.filter((item) => !seen.has(createSearchKey(extractCityName(item.description)))),
+  ];
+};
+
+export const selectDestination = (item, updateCity, updateAccommodationName) => {
+  if (item.type === "destination") {
+    localStorage.setItem("selectedDestination", item.destinationId);
+    localStorage.setItem("selectedCity", item.description);
+    localStorage.removeItem("selectedAccommodation");
+    updateCity?.(item.description);
+    updateAccommodationName?.("");
+    return true;
+  }
+  localStorage.removeItem("selectedDestination");
+  return false;
 };
