@@ -76,4 +76,10 @@ echo
 # -H 0.0.0.0 is not optional: Replit proxies in from outside the container,
 # so a server bound to localhost is running and unreachable, which looks
 # exactly like "nothing happened".
+# Next.js phones home with anonymous build telemetry by default. This
+# project's rules are explicit that nothing gets sent without consent; that
+# rule is about guests, and holding to it for the developer's own machine
+# costs one environment variable.
+export NEXT_TELEMETRY_DISABLED=1
+
 exec pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p 5000
