@@ -74,6 +74,7 @@ pnpm run generate -- --custom --name <name>   # empty migration for hand-written
 pnpm run migrate                  # apply migrations (scripts/migrate.mjs)
 pnpm run migrate:drizzle-kit      # the drizzle-kit equivalent; same ledger
 bash ../../scripts/diagnose-db.sh # dump extensions, tables, migrations, columns
+bash ../../scripts/reset-db.sh    # DESTRUCTIVE: drop all and rebuild (asks first)
 # NEVER `pnpm run push` on this project — drizzle-kit push diffs the TS
 # schema and would create every table WITHOUT listings.geog and
 # destinations.centre (both hand-written; see the PostGIS gotcha below).
@@ -253,6 +254,11 @@ message *or* in the timing. See `docs/ACCOUNTS.md`.
 
 Each of these cost real debugging time. Don't rediscover them.
 
+- **`42P07` / `42710` on migrate means someone ran `drizzle-kit push`.** A
+  table or type exists that no migration created, and there is no ledger.
+  Never adopt that schema by skipping migrations: a pushed schema has no
+  `listings.geog` and no `destinations.centre`, so it looks complete and
+  every geographic query fails. On a dev database, `scripts/reset-db.sh`.
 - **`drizzle-kit migrate` swallows the Postgres error.** A failing migration
   prints a spinner and exits 1 — no error code, no message, no filename, so
   the visible output is just `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. That cost a

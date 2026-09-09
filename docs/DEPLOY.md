@@ -42,6 +42,26 @@ Replit proxies in from outside the container. A server bound to `localhost`
 is running perfectly and unreachable — which looks exactly like "nothing
 happened".
 
+### If migrations fail with "already exists"
+
+`42P07 relation ... already exists` or `42710 type ... already exists` means
+the database has a partial schema that no migration created — the signature
+of `drizzle-kit push`, which builds tables by diffing the TypeScript schema
+and leaves no ledger. The old `post-merge.sh` ran it, so a Repl that pulled
+before that was fixed will be in this state.
+
+```sh
+bash scripts/reset-db.sh
+```
+
+It lists every table with its row count, warns if there are bookings, and
+asks you to type `reset` before touching anything.
+
+**Do not work around it by skipping the migration.** A pushed schema has no
+`listings.geog` and no `destinations.centre`, because drizzle-kit cannot emit
+a PostGIS type modifier. The database would look complete and every map,
+destination and distance query would fail.
+
 ### If PostGIS is missing
 
 Use Replit's **Database** tab (its Postgres supports PostGIS) rather than a

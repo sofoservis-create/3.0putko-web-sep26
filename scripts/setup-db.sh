@@ -58,6 +58,26 @@ if ! pnpm --filter @workspace/db run migrate > "$migrate_log" 2>&1; then
   sed 's/^/    /' "$migrate_log" >&2
   echo "    ----------------------------------------" >&2
   echo >&2
+  # Recognise the one failure that has a specific, correct answer, rather
+  # than leaving every failure to a generic "run the diagnostics".
+  if grep -qE '42P07|42710' "$migrate_log"; then
+    echo "    ── What this means ──────────────────────────────────────" >&2
+    echo "    A table or type already exists that no migration created." >&2
+    echo "    That is the signature of \`drizzle-kit push\`: it builds a" >&2
+    echo "    schema by diffing the TypeScript definitions and leaves no" >&2
+    echo "    migration ledger behind." >&2
+    echo >&2
+    echo "    Do NOT work around it by skipping the migration. A pushed" >&2
+    echo "    schema has no listings.geog and no destinations.centre —" >&2
+    echo "    drizzle-kit cannot emit a PostGIS type modifier — so the" >&2
+    echo "    database would look complete and every map, destination and" >&2
+    echo "    distance query would fail." >&2
+    echo >&2
+    echo "    On a development database, start over:" >&2
+    echo "      bash scripts/reset-db.sh" >&2
+    echo "    It lists what it would delete and asks before doing it." >&2
+    echo >&2
+  fi
   echo "    For a full picture of the database, run:" >&2
   echo "      bash scripts/diagnose-db.sh" >&2
   rm -f "$migrate_log"
