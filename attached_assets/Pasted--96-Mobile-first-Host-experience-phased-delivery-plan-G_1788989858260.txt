@@ -1,0 +1,301 @@
+
+#96 - Mobile-first Host experience: phased delivery plan
+Goal
+Create one seamless Host experience that works first on phones and scales to tablet and desktop. Keep one user identity for traveler and host capabilities. Preserve the existing accommodation contract and 9-step editor while improving recovery, validation, navigation, and clarity.
+
+Every phase must leave Putko in a usable state. A navigation item must not be presented as functional while it only opens a placeholder. New sections are enabled only after their data, loading, empty, error, success, and mobile states work.
+
+Current-state findings
+KEEP
+One account with guest and host capabilities and an active mode.
+Canonical /account and /host destinations with legacy redirects.
+Server-owned accommodation ownership and status.
+Accommodation lifecycle DRAFT → READY → LIVE.
+Server-side completion and publish checks.
+Nine editor topics: basics, location, spaces, amenities, photos, pricing, policies, calendar, and payout readiness.
+Draft cards, completion percentage, last-saved timestamp, review, and publish actions.
+IMPROVE UX
+Mobile editor currently saves only when the user presses Next; the separate Save Draft action is hidden on phones.
+Returning to a draft always starts at step 1 instead of the first incomplete or last visited step.
+Required-field errors are shown mainly at final review instead of next to the relevant step and field.
+Photo setup uses a browser URL prompt instead of an upload flow.
+The Host shell reloads accommodation data in several components rather than using one consistent workspace state.
+In-workspace navigation is component state, so refresh and deep links do not preserve the selected section or listing.
+Multi-property actions need an explicit selected-property context for calendar, reservations, and future payouts.
+RESTRUCTURE
+Separate global Host areas from property-specific areas.
+Global: Today, Listings, Reservations, Messages, Profile, Account, Payout account.
+Property-specific: Overview, Listing editor, Availability calendar, Pricing, Calendar connections, Publish readiness.
+Hide or clearly mark unavailable areas instead of routing core navigation to placeholders.
+Move Stripe Connect to host-level payout setup; a property may later reference the verified account.
+REBUILD ONLY WHERE NECESSARY
+Real reservations, messages, occupancy calendar, image upload, and Stripe Connect require complete data/API flows. Their current placeholders are not a foundation to preserve.
+Do not rebuild the complete accommodation editor or replace legacy accommodation payloads.
+Delivery rules for all phases
+Start with 375–430px layouts, then add tablet and desktop behavior.
+No horizontal scrolling; sticky controls must respect mobile safe areas and the on-screen keyboard.
+Essential actions use at least 44px touch targets and cannot depend on hover.
+Every data screen implements loading, empty, error, retry, success, and permission states.
+Each mutation reports progress, prevents accidental duplicate submission, and gives a recoverable error.
+Unsaved editor changes must be protected; saved drafts must survive refresh and a new session.
+Slovak and English labels remain supported.
+Verify each phase at phone, tablet, and desktop sizes before starting the next phase.
+Do not push, publish, deploy, or merge without explicit user approval immediately beforehand.
+Parallel-agent structure
+Each phase should use independent specialist agents where their work does not overlap:
+
+Product-flow agent: routes, information architecture, state diagrams, empty/error states, copy, and acceptance criteria.
+Mobile UI agent: phone-first layouts, responsive behavior, touch, keyboard, safe areas, and accessibility.
+Data/API agent: ownership, schemas, status transitions, validation, API errors, and backward compatibility.
+Feature agent: implementation of the phase’s isolated UI and state logic.
+Verification agent: one coherent test pass for the completed phase’s critical journeys after integration.
+Agents may analyze in parallel. Implementation agents must own separate files or clearly separated modules. The main agent integrates results, resolves conflicts, runs type/build checks, restarts the affected workflow once, and verifies the whole phase.
+
+Phase 0 — Contract map and safety baseline
+Outcome
+A documented source of truth for routes, roles, accommodation payloads, status transitions, and current working flows. No visible redesign yet.
+
+Parallel work
+Product-flow agent maps traveler activation, first listing, draft return, additional listing, publish, and switch-back-to-travel flows.
+Mobile UI agent inventories all Host screens at phone/tablet/desktop and records clipping, inaccessible actions, and placeholder routes.
+Data/API agent maps account capability, ownership, draft update, deletion, completion, and publish contracts.
+Verification agent records baseline smoke journeys that must remain working.
+Deliverables
+Route and state diagram.
+KEEP / IMPROVE / RESTRUCTURE / REBUILD matrix.
+Shared acceptance checklist for later phases.
+Baseline checks for host activation, create draft, resume draft, publish-ready transition, publish, and traveler switch.
+Exit gate
+No code contract is changed until the current server ownership rules, publish requirements, and legacy compatibility are documented and covered by checks.
+
+Phase 1 — Working Host shell and mobile navigation
+Outcome
+The /host shell is trustworthy, refresh-safe, and mobile-first. Only working destinations are primary navigation.
+
+Scope
+Replace transient activePage navigation with URL-addressable Host routes or query state.
+Mobile bottom navigation initially exposes only working areas: Today, Listings, and Menu.
+Placeholder Reservations, Calendar, and Messages are removed from primary navigation until their phases ship.
+Add consistent mobile header, back behavior, safe-area padding, active-state semantics, and account/traveler switch.
+Preserve /host, /host-preview, and existing onboard return compatibility.
+Parallel work
+Product-flow agent defines route hierarchy and back-button behavior.
+Mobile UI agent builds phone navigation and responsive desktop sidebar behavior.
+Feature agent implements route state and shared Host layout.
+Data/API agent confirms no role or session regressions.
+Working journeys
+Traveler activates Host capability and lands in /host.
+Host refreshes any supported Host location and remains there.
+Browser Back behaves predictably.
+Host switches to traveler mode and returns to /account.
+Logged-out and non-host users are guarded correctly.
+Exit gate
+All visible navigation destinations render real content. Verified at 390px, 768px, and 1280px.
+
+Phase 2 — Listings hub and draft recovery
+Outcome
+Hosts can understand and manage zero, one, or many properties from a reliable mobile Listings hub.
+
+Scope
+Centralize accommodation loading and mutation state for the Host workspace.
+Support zero listings, draft, ready, live, mixed, and multi-property states.
+Make the most important next action explicit on Today and Listings.
+Resume a draft at the first incomplete step; persist last visited step if added without breaking payload compatibility.
+Add safe delete confirmation with property identity and clear post-delete state.
+Route property actions using the property ID instead of implicit workspace state.
+Parallel work
+Product-flow agent defines priority ordering when several properties need attention.
+Mobile UI agent implements compact cards, status labels, progress, and reachable card actions.
+Data/API agent adds only minimal metadata needed for recovery, preferably in the existing JSON payload or a backward-compatible field.
+Feature agent integrates shared listings state and deep links.
+Working journeys
+First-time host starts the first property.
+Returning host continues the correct draft.
+READY property opens directly to review.
+LIVE property opens management without losing edit access.
+Multi-property host can distinguish properties and open the intended one.
+Delete failure preserves the card and offers retry.
+Exit gate
+Zero, draft, ready, live, and mixed multi-property fixtures all work at phone/tablet/desktop widths.
+
+Phase 3 — Mobile-first 9-step accommodation editor
+Outcome
+The preserved editor becomes safe and practical on a phone from first field through publish.
+
+Scope
+Keep the nine conceptual steps and server completion contract.
+Add visible mobile Save Draft or reliable autosave with explicit Saved / Saving / Failed state.
+Add per-step validation and inline field messages before advancing.
+Keep step navigation accessible without a wide sidebar.
+Protect unsaved edits on Back, route changes, and accidental close.
+Make final review link each missing requirement back to its step.
+Ensure sticky footer remains usable above safe areas and the mobile keyboard.
+Keep calendar as Step 8 and payout readiness as Step 9.
+Do not implement Stripe Connect in this phase.
+Step classification
+Basics — IMPROVE UX.
+Location — IMPROVE UX; future geocoding remains separate.
+Rooms & guests — KEEP logic, improve numeric controls and validation.
+Amenities — KEEP with touch/accessibility refinements.
+Photos — REBUILD input only; preserve payload compatibility.
+Pricing — IMPROVE UX and currency/minimum validation.
+Policies — IMPROVE UX and explain required confirmation.
+Calendar — KEEP manual/connect choice; improve feed validation.
+Payout readiness — RESTRUCTURE copy so it does not imply a working Stripe connection.
+Review/publish — KEEP server gate, improve requirement navigation and mobile modal/sheet.
+Parallel work
+Mobile UI agent owns step navigation, sticky actions, inline errors, and keyboard/safe-area behavior.
+Data/API agent aligns client validation with server completion without weakening server checks.
+Feature agent owns save lifecycle, recovery, and review links.
+Separate media agent implements actual image upload only after storage is chosen; until then, do not present URL prompt as production-ready.
+Working journeys
+Create a draft and save from every step on mobile.
+Refresh and resume without data loss.
+Fix a missing requirement from review and return to review.
+Handle save failure and retry without losing entered data.
+Reach READY only when server requirements pass.
+Publish only from READY; failed publish remains recoverable.
+Exit gate
+Complete one full listing on a 390px viewport using touch-sized controls, then verify tablet and desktop. Server completion remains authoritative.
+
+Phase 4 — Property calendar and availability
+Outcome
+Each property has a real, usable availability area before Calendar is restored to primary navigation.
+
+Scope
+Property selector for multi-property hosts.
+Manual blocked/available dates.
+Clear synchronization status for configured iCal feeds.
+Validation and retry for malformed or failed feeds.
+Consistent relationship between editor Step 8 and ongoing property calendar management.
+No fake claim of real-time synchronization if the backend cannot provide it.
+Parallel work
+Product-flow agent defines manual and external-calendar states.
+Mobile UI agent builds touch-friendly month/list views and property switching.
+Data/API agent designs availability and feed contracts compatible with the target PostgreSQL/PostGIS architecture.
+Feature agent implements the isolated calendar module.
+Working journeys
+Select property, view availability, block/unblock dates, and persist changes.
+Add, edit, remove, and retry a calendar feed.
+Switching properties cannot leak one property’s calendar into another.
+Exit gate
+Calendar is added to Host navigation only after persistence and multi-property isolation work.
+
+Phase 5 — Reservation operations
+Outcome
+Reservations becomes a real operational section, not a placeholder.
+
+Scope
+Request/inquiry, accepted, declined, cancelled, upcoming, active, and completed states based on actual supported booking contracts.
+Property filtering and clear guest/stay context.
+Mobile action detail with safe confirmation for irreversible actions.
+Calendar updates and listing availability remain consistent after reservation changes.
+If legacy booking APIs cannot support an action, do not expose it.
+Parallel work
+Product-flow agent maps allowed reservation transitions and priority tasks.
+Mobile UI agent builds list/detail patterns and urgent action surfaces.
+Data/API agent implements ownership and transactional transition rules.
+Feature agent integrates reservation data with property context.
+Working journeys
+View reservations for all or one property.
+Open detail, perform each supported transition, and see the updated state.
+Empty, loading, failed, and forbidden states are complete.
+Exit gate
+Reservations enters primary navigation only after its supported actions persist and calendar consistency is verified.
+
+Phase 6 — Host profile, account, and payout readiness
+Outcome
+Global host identity and property settings are clearly separated.
+
+Scope
+Public Host Profile: information travelers may see.
+Personal Account: shared traveler/host identity and security.
+Host payout status: one host-level verified account, with future property assignment.
+Replace disabled Stripe controls with honest readiness information until real Stripe Connect is approved.
+Preserve current traveler account behavior.
+Parallel work
+Product-flow agent defines data ownership and visibility boundaries.
+Mobile UI agent creates profile/account forms with clear save feedback.
+Data/API agent separates shared account, public host profile, and payout-status contracts.
+Stripe specialist is used only after explicit approval to implement Stripe Connect.
+Working journeys
+Edit public profile and see saved data after refresh.
+Edit shared personal details without creating a second identity.
+Switch between traveler and host without losing capabilities.
+View accurate payout readiness; no dead connection button.
+Exit gate
+Profile and payout destinations are enabled only when their data persists and authorization is enforced.
+
+Phase 7 — Messages and operational dashboard
+Outcome
+The Host dashboard becomes an operational home for real data, and Messages is added only if a complete messaging contract exists.
+
+Scope
+Today view prioritizes incomplete setup, reservation actions, calendar conflicts, unread messages, and payout blockers.
+Multi-property filtering without forcing a property choice for global tasks.
+Messages list/detail/composer only after persistence, authorization, delivery state, and error handling exist.
+Remove promotional or empty cards that do not help the host act.
+Parallel work
+Product-flow agent defines priority rules and dashboard information hierarchy.
+Mobile UI agent creates scannable, one-hand-friendly task cards.
+Data/API agent supplies aggregated counts and message ownership contracts.
+Feature agent integrates modules without duplicating their source data.
+Working journeys
+Dashboard accurately reflects each implemented module.
+Every dashboard CTA opens the exact property and task.
+Message send failure preserves the draft and supports retry.
+Exit gate
+No dashboard metric or CTA is simulated. Every visible item comes from a working module.
+
+Phase 8 — Hardening and release readiness
+Outcome
+All completed Host sections work together as one responsive product.
+
+Scope
+Cross-phase loading, errors, retries, authorization, localization, and accessibility.
+Performance and request deduplication.
+Backward compatibility with legacy routes and accommodation payloads.
+Phone, tablet, desktop, keyboard, and reduced-motion checks.
+Critical journey regression coverage.
+Verification matrix
+New traveler → activate host → create draft.
+Return later → resume exact property and correct step.
+Complete all nine steps → review → publish.
+Add second property → switch property safely.
+Manage calendar and reservations when those phases are enabled.
+Edit host profile and switch back to traveler.
+Network failure during every mutation retains a recoverable state.
+Exit gate
+Build/type checks pass, workflows start cleanly, no primary Host navigation opens a placeholder, and critical journeys pass at 390px, 768px, and 1280px.
+
+Recommended implementation order
+Phase 0 safety baseline.
+Phase 1 working shell.
+Phase 2 listings and recovery.
+Phase 3 editor hardening.
+Phase 4 calendar.
+Phase 5 reservations.
+Phase 6 profile/account/payout readiness.
+Phase 7 messages and operational dashboard.
+Phase 8 hardening.
+Phases 4, 5, and 6 may be designed in parallel after Phase 2, but should be integrated one at a time. Phase 7 depends on the real data produced by those modules.
+
+Explicitly deferred
+Live-data migration from Render/MongoDB.
+Production Stripe Connect until separately approved.
+PostGIS destination work.
+Replacing the existing accommodation contract.
+Publishing, deployment, pushing, or merging without immediate user approval.
+Primary code areas
+artifacts/putko/src/AppRoutes.jsx
+artifacts/putko/src/app/ProtectedRoute.jsx
+artifacts/putko/src/app/context/AuthContext.jsx
+artifacts/putko/src/app/host-preview/page.jsx
+artifacts/putko/src/app/host-preview/components/Overview.jsx
+artifacts/putko/src/app/host-preview/components/AccommodationsList.jsx
+artifacts/putko/src/app/host-preview/components/AccommodationForm.jsx
+artifacts/putko/src/app/utlis/guestAccountApi.js
+artifacts/api-server/src/routes/test-auth.ts
+artifacts/api-server/src/lib/test-host-accommodation.ts
+lib/db/src/schema/test-guests.ts
+lib/db/src/schema/test-host-accommodations.ts
