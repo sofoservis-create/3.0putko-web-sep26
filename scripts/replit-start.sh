@@ -82,4 +82,13 @@ echo
 # costs one environment variable.
 export NEXT_TELEMETRY_DISABLED=1
 
-exec pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p 5000
+APP_PORT="${PORT:-5000}"
+
+# Running this setup command twice should not fail just because the first
+# Next.js process is still healthy.
+if curl --silent --fail --max-time 3 "http://127.0.0.1:${APP_PORT}" >/dev/null 2>&1; then
+  ok "App is already running on port ${APP_PORT}"
+  exit 0
+fi
+
+exec pnpm --filter @workspace/web exec next dev -H 0.0.0.0 -p "$APP_PORT"
