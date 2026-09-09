@@ -465,8 +465,7 @@ function HostModeTeaser({ language, user, isDevelopmentAccount, activateHost, sw
         await activateHost();
         setConfirming(false);
         toast.success(language === "en" ? "Host mode activated!" : "Hostiteľský režim bol aktivovaný!");
-        localStorage.setItem("putko:start-host-onboarding", "true");
-        window.location.href = "/host";
+        window.location.href = "/host/listings/new";
       }
     } catch (error) {
       toast.error(error.message || (language === "en" ? "Something went wrong" : "Niečo sa pokazilo"));

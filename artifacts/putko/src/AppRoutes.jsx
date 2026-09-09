@@ -64,7 +64,8 @@ function LegacyHostRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.push("/host");
+    // Replace so the legacy entry does not trap browser Back.
+    router.replace("/host");
   }, [router]);
 
   return <Fallback />;
@@ -116,7 +117,7 @@ export default function AppRoutes() {
         <Route path="/paypage" component={PayPage} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
         <Route path="/account" component={Account} />
-        <Route path="/host" component={HostWorkspace} />
+        <Route path="/host/*?" component={HostWorkspace} />
         <Route path="/guest" component={LegacyAccountRedirect} />
         <Route path="/profile" component={LegacyAccountRedirect} />
         <Route path="/host-preview" component={LegacyHostRedirect} />

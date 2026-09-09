@@ -86,7 +86,7 @@ const NavMobile = ({ onClickClose }) => {
       setActivatingHost(true);
       if (role !== "host") await switchMode("host");
       onClickClose();
-      window.location.href = "/host";
+      window.location.href = "/host/listings/new";
     } catch (error) {
       toast.error(error.message || (lang === "en" ? "Something went wrong." : "Niečo sa pokazilo."));
     } finally {
@@ -101,8 +101,7 @@ const NavMobile = ({ onClickClose }) => {
       toast.success(lang === "en" ? "Host mode activated!" : "Hostiteľský režim bol aktivovaný!");
       setShowHostActivation(false);
       onClickClose();
-      localStorage.setItem("putko:start-host-onboarding", "true");
-      window.location.href = "/host";
+      window.location.href = "/host/listings/new";
     } catch (error) {
       toast.error(error.message || (lang === "en" ? "Something went wrong." : "Niečo sa pokazilo."));
     } finally {

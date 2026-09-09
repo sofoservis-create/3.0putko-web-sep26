@@ -48,10 +48,28 @@ const AMENITIES_LIST = [
   { id: "washer", en: "Washer", sk: "Práčka" },
 ];
 
-export default function AccommodationForm({ accommodationId, onBack, openReview = false }) {
+export default function AccommodationForm({
+  accommodationId,
+  onBack,
+  onCreated,
+  openReview = false,
+  onReviewDismiss,
+}) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
   const [localId, setLocalId] = useState(accommodationId);
+  // Mirrors localId synchronously so the route-sync effect below can tell a
+  // URL change we caused (first save replaced /new with the new id) from a
+  // real navigation to another listing.
+  const localIdRef = useRef(accommodationId ?? null);
+  // Editing session counter. Bumped whenever the route points the editor at a
+  // different listing so late responses from a previous session are ignored.
+  const sessionRef = useRef(0);
+  // Set right before the first save assigns the created id, so the id-change
+  // effect does not issue a GET that could race the PATCH in flight.
+  const skipNextLoadRef = useRef(false);
+  const prevOpenReviewRef = useRef(openReview);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -62,9 +80,54 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
   const [showPreview, setShowPreview] = useState(false);
   const previewDialogRef = useRef(null);
 
+  // The editor is URL-driven: when the route changes to another listing (or to
+  // "new"), reset the local editing session. After the first save creates a
+  // listing, the URL is replaced with its id and localId already matches, so
+  // the in-progress step is preserved.
   useEffect(() => {
+    if ((accommodationId ?? null) === localIdRef.current) return;
+    localIdRef.current = accommodationId ?? null;
+    sessionRef.current += 1;
+    skipNextLoadRef.current = false;
+    setLocalId(accommodationId ?? null);
+    setData({});
+    setStatus(null);
+    setCompletion({});
+    setCurrentStep(0);
+    setShowPreview(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accommodationId]);
+
+  useEffect(() => {
+    if (skipNextLoadRef.current) {
+      skipNextLoadRef.current = false;
+      return;
+    }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId]);
+
+  // Keep the publish-review dialog in sync with the `?review=1` URL state so
+  // Back/Forward between the plain editor and the review URL behaves.
+  useEffect(() => {
+    const wasOpen = prevOpenReviewRef.current;
+    prevOpenReviewRef.current = openReview;
+    if (openReview) {
+      if (!loading && localId && status === "READY") {
+        setCurrentStep(STEPS.length - 1);
+        setShowPreview(true);
+      }
+    } else if (wasOpen) {
+      setShowPreview(false);
+    }
+  }, [openReview, loading, localId, status]);
+
+  const closePreview = () => {
+    setShowPreview(false);
+    if (openReview) onReviewDismiss?.();
+  };
+  const closePreviewRef = useRef(closePreview);
+  closePreviewRef.current = closePreview;
 
   useEffect(() => {
     if (!showPreview) return undefined;
@@ -72,7 +135,7 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
     const previouslyFocused = document.activeElement;
     const handleDialogKeyDown = (event) => {
       if (event.key === "Escape") {
-        setShowPreview(false);
+        closePreviewRef.current();
         return;
       }
       if (event.key !== "Tab" || !previewDialogRef.current) return;
@@ -102,10 +165,12 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
   }, [showPreview]);
 
   const loadData = async () => {
+    const session = sessionRef.current;
     setLoading(true);
     try {
       if (localId) {
         const res = await getHostAccommodation(localId);
+        if (session !== sessionRef.current) return;
         setData(res.data || {});
         setStatus(res.status);
         setCompletion({
@@ -114,29 +179,32 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
           missing: res.missingRequirements || [],
           canPublish: res.canPublish
         });
-        if (openReview && res.status === "READY") {
-          setCurrentStep(STEPS.length - 1);
-          setShowPreview(true);
-        }
       }
     } catch (err) {
+      if (session !== sessionRef.current) return;
       toast.error(language === "en" ? "Failed to load" : "Nepodarilo sa načítať");
     } finally {
-      setLoading(false);
+      if (session === sessionRef.current) setLoading(false);
     }
   };
 
   const handleSave = async (moveToNext = false) => {
+    const session = sessionRef.current;
     setSaving(true);
     try {
       let idToSave = localId;
       if (!idToSave) {
         const created = await createHostAccommodation();
+        if (session !== sessionRef.current) return null;
         idToSave = created.id;
+        localIdRef.current = idToSave;
+        skipNextLoadRef.current = true;
         setLocalId(idToSave);
+        onCreated?.(idToSave);
       }
 
       const res = await updateHostAccommodation(idToSave, data);
+      if (session !== sessionRef.current) return null;
       setData(res.data || {});
       setStatus(res.status);
       setCompletion({
@@ -154,10 +222,11 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
       }
       return res;
     } catch (err) {
+      if (session !== sessionRef.current) return null;
       toast.error(language === "en" ? "Failed to save" : "Nepodarilo sa uložiť");
       return null;
     } finally {
-      setSaving(false);
+      if (session === sessionRef.current) setSaving(false);
     }
   };
 
@@ -175,7 +244,7 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
       await publishHostAccommodation(localId);
       toast.success(language === "en" ? "Published successfully!" : "Úspešne zverejnené!");
       loadData();
-      setShowPreview(false);
+      closePreview();
     } catch (err) {
       toast.error(language === "en" ? "Failed to publish" : "Nepodarilo sa zverejniť");
     } finally {
@@ -616,7 +685,7 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
           >
             <div className="p-6 border-b border-neutral-100 flex items-center justify-between bg-neutral-50">
               <h2 id="publish-review-title" className="text-xl font-bold text-[#1E3E2B]">{language === "en" ? "Publish Review" : "Kontrola pred zverejnením"}</h2>
-              <button autoFocus type="button" onClick={() => setShowPreview(false)} aria-label={language === "en" ? "Close publish review" : "Zavrieť kontrolu pred zverejnením"} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-neutral-400 hover:text-neutral-900 shadow-sm border border-neutral-200">
+              <button autoFocus type="button" onClick={closePreview} aria-label={language === "en" ? "Close publish review" : "Zavrieť kontrolu pred zverejnením"} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-neutral-400 hover:text-neutral-900 shadow-sm border border-neutral-200">
                 <span className="text-xl leading-none font-bold">&times;</span>
               </button>
             </div>
@@ -700,7 +769,7 @@ export default function AccommodationForm({ accommodationId, onBack, openReview 
             </div>
 
             <div className="p-6 border-t border-neutral-100 bg-neutral-50 flex items-center justify-end gap-3">
-              <button type="button" onClick={() => setShowPreview(false)} className="px-6 py-3.5 rounded-xl font-bold text-neutral-600 hover:bg-neutral-200 transition-colors">
+              <button type="button" onClick={closePreview} className="px-6 py-3.5 rounded-xl font-bold text-neutral-600 hover:bg-neutral-200 transition-colors">
                 {language === "en" ? "Keep Editing" : "Pokračovať v úprave"}
               </button>
               <button

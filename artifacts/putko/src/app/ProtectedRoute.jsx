@@ -16,7 +16,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     if (loading) return;
 
     if (!token) {
-      const returnTo = pathname?.startsWith("/") ? pathname : "/";
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const returnTo = pathname?.startsWith("/") ? `${pathname}${search}` : "/";
       router.push(`/login?returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }

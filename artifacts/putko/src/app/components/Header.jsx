@@ -117,7 +117,7 @@ const Header = () => {
     if (isDevelopmentAccount) {
       if (user?.capabilities?.includes("host")) {
         if (role !== "host") await switchMode("host");
-        router.push("/host");
+        router.push("/host/listings/new");
       } else {
         toast.info(language === "en" ? "Activate host mode in your traveler account first." : "Najprv si v účte cestovateľa aktivujte režim hostiteľa.");
         router.push("/account");

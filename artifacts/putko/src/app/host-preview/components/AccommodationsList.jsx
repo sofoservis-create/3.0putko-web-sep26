@@ -1,39 +1,16 @@
 import React, { useContext, useEffect, useState } from "react";
 import { FormContext } from "../../FormContext";
-import { Plus, Home, MapPin, Edit, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Home, MapPin, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { listHostAccommodations, deleteHostAccommodation } from "../../utlis/guestAccountApi";
 import { toast } from "react-toastify";
-import AccommodationForm from "./AccommodationForm";
 
-export default function AccommodationsList({
-  initialFormId = null,
-  setFormAction,
-  onFormOpenChange,
-  onNavigate,
-}) {
+export default function AccommodationsList({ onOpen, onCreate, onChanged }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
   
   const [accommodations, setAccommodations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showRequirements, setShowRequirements] = useState(false);
-  const [activeFormId, setActiveFormId] = useState(null);
-  const [openReview, setOpenReview] = useState(false);
-
-  useEffect(() => {
-    if (initialFormId) {
-      const target =
-        typeof initialFormId === "object"
-          ? initialFormId
-          : { id: initialFormId, review: false };
-      setOpenReview(Boolean(target.review));
-      setActiveFormId(target.id);
-    }
-  }, [initialFormId]);
-
-  useEffect(() => {
-    onFormOpenChange?.(activeFormId !== null);
-  }, [activeFormId, onFormOpenChange]);
 
   const loadData = async () => {
     setLoading(true);
@@ -48,40 +25,21 @@ export default function AccommodationsList({
   };
 
   useEffect(() => {
-    if (activeFormId === null) {
-      loadData();
-    }
-  }, [activeFormId]);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDelete = async (id) => {
     if (!window.confirm(language === "en" ? "Delete this accommodation?" : "Vymazať toto ubytovanie?")) return;
     try {
       await deleteHostAccommodation(id);
       toast.success(language === "en" ? "Deleted" : "Vymazané");
+      onChanged?.();
       loadData();
     } catch (err) {
       toast.error(language === "en" ? "Failed to delete" : "Nepodarilo sa vymazať");
     }
   };
-
-  const handleBack = () => {
-    setActiveFormId(null);
-    setOpenReview(false);
-    if (setFormAction) setFormAction(null);
-  };
-
-  if (activeFormId !== null) {
-    return (
-      <div className="animate-fadeIn w-full">
-        <AccommodationForm
-          key={activeFormId}
-          accommodationId={activeFormId === "new" ? null : activeFormId}
-          openReview={openReview}
-          onBack={handleBack}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-0 animate-fadeIn">
@@ -97,10 +55,7 @@ export default function AccommodationsList({
         {accommodations.length > 0 && (
           <button
             type="button"
-            onClick={() => {
-              setOpenReview(false);
-              setActiveFormId("new");
-            }}
+            onClick={onCreate}
             className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#DFBA73] text-[#1E3E2B] font-bold hover:bg-[#c9a561] transition-colors shadow-sm w-full sm:w-auto"
           >
             <Plus size={20} />
@@ -128,10 +83,7 @@ export default function AccommodationsList({
           </p>
           <button
             type="button"
-            onClick={() => {
-              setOpenReview(false);
-              setActiveFormId("new");
-            }}
+            onClick={onCreate}
             className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-[#1E3E2B] text-white font-bold hover:bg-[#163021] transition-colors w-full sm:w-auto shadow-md"
           >
             <Plus size={20} />
@@ -232,10 +184,7 @@ export default function AccommodationsList({
                     <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
                       <button
                         type="button"
-                        onClick={() => {
-                          setOpenReview(isReady);
-                          setActiveFormId(acc.id);
-                        }}
+                        onClick={() => onOpen(acc.id, { review: isReady })}
                         className="flex-1 px-4 py-3.5 bg-neutral-50 hover:bg-[#1E3E2B] text-[#1E3E2B] hover:text-white rounded-xl text-[14px] font-bold transition-colors flex items-center justify-center gap-2"
                       >
                         {isDraft
@@ -244,15 +193,6 @@ export default function AccommodationsList({
                             ? (language === "en" ? "Review and publish" : "Skontrolovať a zverejniť")
                             : (language === "en" ? "Manage" : "Spravovať")}
                       </button>
-                      {isLive && (
-                        <button
-                          type="button"
-                          onClick={() => onNavigate?.("Occupancy calendar")}
-                          className="min-h-11 rounded-xl border border-neutral-200 px-3 text-sm font-bold text-[#1E3E2B] transition-colors hover:bg-neutral-50"
-                        >
-                          {language === "en" ? "Calendar" : "Kalendár"}
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => handleDelete(acc.id)}
