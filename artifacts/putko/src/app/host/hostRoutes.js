@@ -7,8 +7,13 @@ export const HOST_ROOT = "/host";
 // Operational stages a reservation can be filtered by (mirrors the server).
 export const RESERVATION_STAGES = ["request", "upcoming", "active", "completed", "declined", "cancelled"];
 
+const withProperty = (path, property) =>
+  property ? `${path}?${new URLSearchParams({ property }).toString()}` : path;
+
 export const hostPaths = {
+  // Today; an optional property filter narrows property-specific tasks.
   today: HOST_ROOT,
+  todayFor: (property = null) => withProperty(HOST_ROOT, property),
   listings: `${HOST_ROOT}/listings`,
   newListing: `${HOST_ROOT}/listings/new`,
   listing: (id, { review = false, step = null } = {}) => {
@@ -31,6 +36,9 @@ export const hostPaths = {
     return `${HOST_ROOT}/reservations${query ? `?${query}` : ""}`;
   },
   reservation: (id) => `${HOST_ROOT}/reservations/${encodeURIComponent(id)}`,
+  // Messages list (optional property filter) and one thread.
+  messages: ({ property = null } = {}) => withProperty(`${HOST_ROOT}/messages`, property),
+  conversation: (id) => `${HOST_ROOT}/messages/${encodeURIComponent(id)}`,
   // Host-level settings (not tied to a property).
   profile: `${HOST_ROOT}/profile`,
   payouts: `${HOST_ROOT}/payouts`,
@@ -57,12 +65,14 @@ const decodeId = (raw) => {
 
 /**
  * Resolve the current Host location.
- * Returns `{ section, listingId, review, step, reservationId, filters }` or
- * `null` when the path is not a known Host screen so the workspace can
- * redirect to the Today view. `section` is one of today | listings | listing
- * | calendar | reservations | reservation | profile | payouts | menu; the calendar section
- * carries `listingId` when it is property-scoped, the reservations list
- * carries its `filters` and a reservation detail its `reservationId`.
+ * Returns `{ section, listingId, review, step, reservationId, conversationId,
+ * filters }` or `null` when the path is not a known Host screen so the
+ * workspace can redirect to the Today view. `section` is one of today |
+ * listings | listing | calendar | reservations | reservation | messages |
+ * conversation | profile | payouts | menu; the calendar section carries
+ * `listingId` when it is property-scoped, Today / the reservations list / the
+ * messages list carry their `filters`, a reservation detail its
+ * `reservationId` and a thread its `conversationId`.
  */
 export function resolveHostLocation(pathname, search = "") {
   const path = (pathname || "").replace(/\/+$/, "") || "/";
@@ -70,9 +80,11 @@ export function resolveHostLocation(pathname, search = "") {
   const review = params.get("review") === "1";
   const requestedStep = params.get("step");
   const step = requestedStep && EDITOR_STEP_IDS.includes(requestedStep) ? requestedStep : null;
-  const base = { listingId: null, review: false, step: null, reservationId: null, filters: null };
+  const base = { listingId: null, review: false, step: null, reservationId: null, conversationId: null, filters: null };
+  const propertyFilter = () => ({ property: params.get("property")?.trim() || null });
 
-  if (path === HOST_ROOT) return { ...base, section: "today" };
+  if (path === HOST_ROOT) return { ...base, section: "today", filters: propertyFilter() };
+  if (path === `${HOST_ROOT}/messages`) return { ...base, section: "messages", filters: propertyFilter() };
   if (path === hostPaths.listings) return { ...base, section: "listings" };
   if (path === hostPaths.newListing) return { ...base, section: "listing" };
   if (path === hostPaths.calendar) return { ...base, section: "calendar" };
@@ -85,10 +97,16 @@ export function resolveHostLocation(pathname, search = "") {
       ...base,
       section: "reservations",
       filters: {
-        property: params.get("property")?.trim() || null,
+        ...propertyFilter(),
         stage: stage && RESERVATION_STAGES.includes(stage) ? stage : null,
       },
     };
+  }
+
+  const conversationMatch = path.match(/^\/host\/messages\/([^/]+)$/);
+  if (conversationMatch) {
+    const conversationId = decodeId(conversationMatch[1]);
+    return conversationId ? { ...base, section: "conversation", conversationId } : null;
   }
 
   const reservationMatch = path.match(/^\/host\/reservations\/([^/]+)$/);

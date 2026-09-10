@@ -126,3 +126,28 @@ export const getHostProfile = () => testGuestRequest("/host-profile");
 export const saveHostProfile = (profile) =>
   testGuestRequest("/host-profile", { method: "PUT", body: JSON.stringify(profile) });
 export const getHostPayoutReadiness = () => testGuestRequest("/host-payouts");
+
+// Messages (development Host workspace). Threads are participant-only on the
+// server; `clientKey` makes a retried send idempotent so a lost response can
+// never store the same message twice. There is no push transport: screens
+// poll the thread endpoint while open.
+export const listHostConversations = ({ accommodationId } = {}) =>
+  testGuestRequest(
+    `/host-conversations${accommodationId ? `?${new URLSearchParams({ accommodationId })}` : ""}`,
+  );
+export const getHostConversation = (id) =>
+  testGuestRequest(`/host-conversations/${encodeURIComponent(id)}`);
+export const sendHostMessage = (id, { body, clientKey }) =>
+  testGuestRequest(`/host-conversations/${encodeURIComponent(id)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body, clientKey }),
+  });
+export const markHostConversationRead = (id) =>
+  testGuestRequest(`/host-conversations/${encodeURIComponent(id)}/read`, { method: "POST" });
+// Development only: seeds a guest message (a new thread for a listing, or a
+// reply into an existing thread) so the host flow can be exercised.
+export const createHostMessageFixture = (target) =>
+  testGuestRequest("/host-conversations/fixtures", { method: "POST", body: JSON.stringify(target) });
+
+// Today dashboard: read-only aggregation over the modules above.
+export const getHostDashboard = () => testGuestRequest("/host-dashboard");

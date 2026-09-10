@@ -1,217 +1,297 @@
-import React, { useContext, useMemo } from "react";
-import { FormContext } from "../../FormContext";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  House, ArrowRight, CheckCircle2, AlertCircle, Plus, BookOpenText, RefreshCw,
+  AlertCircle, AlertTriangle, CalendarX2, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Landmark,
+  ListChecks, MessageSquareText, RefreshCw,
 } from "lucide-react";
 import Link from "@/app/components/NextLink";
+import { FormContext } from "../../FormContext";
+import { getHostDashboard } from "../../utlis/guestAccountApi";
 import { useHostListings } from "../../host/HostListingsContext";
+import { useHostNavigation } from "../../host/HostNavigationGuard";
+import { useHostReservations } from "../../host/reservations/HostReservationsContext";
+import { useHostMessages } from "../../host/messages/HostMessagesContext";
+import { listingName } from "../../host/hostListingModel";
+import { hostPaths } from "../../host/hostRoutes";
 import {
-  countAttentionListings,
-  countByStatus,
-  listingDisplayPercent,
-  listingName,
-  nextStepTitle,
-  selectPriorityListing,
-} from "../../host/hostListingModel";
+  buildTodayTasks,
+  dashboardErrorText,
+  filterTasks,
+  groupTasks,
+  summaryFigures,
+} from "../../host/dashboard/hostDashboardModel";
 
-const HOST_GUIDE_PATH = "/user-guide";
+const t = (language, en, sk) => (language === "en" ? en : sk);
 
-export default function Overview({ onOpenListing, onCreateListing, onOpenListings }) {
+const GROUP_ICON = {
+  setup: ListChecks,
+  requests: ClipboardList,
+  calendar: CalendarX2,
+  messages: MessageSquareText,
+  payouts: Landmark,
+};
+
+const TONE = {
+  urgent: { card: "border-red-200 border-l-4 border-l-red-500", icon: "bg-red-50 text-red-600" },
+  warn: { card: "border-amber-300 border-l-4 border-l-amber-500", icon: "bg-amber-50 text-amber-700" },
+  todo: { card: "border-neutral-200 border-l-4 border-l-[#DFBA73]", icon: "bg-[#DFBA73]/10 text-[#DFBA73]" },
+  info: { card: "border-neutral-200 border-l-4 border-l-[#1E3E2B]", icon: "bg-[#1E3E2B]/5 text-[#1E3E2B]" },
+};
+
+/** One task: the whole card is the link to the exact screen that resolves it. */
+function TaskCard({ task, language }) {
+  const { linkProps } = useHostNavigation();
+  const Icon = GROUP_ICON[task.group];
+  const tone = TONE[task.tone] ?? TONE.info;
+  return (
+    <li>
+      <Link
+        {...linkProps(task.href)}
+        className={`flex min-h-[72px] items-center gap-3 rounded-2xl border bg-white p-4 shadow-sm transition-colors hover:border-[#DFBA73] ${tone.card}`}
+      >
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone.icon}`} aria-hidden="true">
+          <Icon size={20} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-bold text-[#1E3E2B]">{task.title}</span>
+          <span className="mt-0.5 block text-[13px] leading-snug text-neutral-600">{task.detail}</span>
+        </span>
+        <ChevronRight size={20} className="shrink-0 text-neutral-400" />
+        <span className="sr-only">{t(language, "Open", "Otvoriť")}</span>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Today: the host's operational home. Everything on it comes from the
+ * dashboard summary endpoint, which aggregates the modules' own data
+ * (listings, reservations, calendar, messages, payouts) — nothing here is
+ * simulated. Tasks are ordered by priority: setup → requests → calendar →
+ * messages → payouts. A property filter narrows property-specific tasks;
+ * host-level tasks always stay visible.
+ */
+export default function Overview({ filters }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
-  const en = language === "en";
-  const { listings, loaded, loading, error, refresh } = useHostListings();
+  const { listings, loaded: listingsLoaded } = useHostListings();
+  const { guardedNavigate, linkProps } = useHostNavigation();
+  // Any change in the modules' stores re-fetches the summary so Today never
+  // shows a number the owning module already moved past.
+  const { reservations } = useHostReservations();
+  const { conversations } = useHostMessages();
 
-  const counts = useMemo(() => countByStatus(listings), [listings]);
-  const target = useMemo(() => selectPriorityListing(listings), [listings]);
-  const attention = countAttentionListings(listings);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const mountedRef = useRef(true);
+  const inFlightRef = useRef(false);
 
-  const showLoading = !loaded && loading;
-  const showError = !loaded && !loading && error;
-
-  const getPriority = () => {
-    if (showLoading || showError) return null;
-    if (listings.length === 0) {
-      return {
-        type: "new",
-        title: en ? "Create your first listing" : "Vytvorte svoju prvú ponuku",
-        desc: en ? "Start earning by sharing your space." : "Začnite zarábať zdieľaním svojho priestoru.",
-        action: en ? "Get started" : "Začať",
-        onClick: onCreateListing,
-        icon: Plus,
-        color: "text-[#DFBA73]",
-        bg: "bg-[#DFBA73]/10",
-        border: "border-[#DFBA73]/20",
-        btnColor: "bg-[#DFBA73] text-[#1E3E2B] hover:bg-[#c9a561]",
-      };
-    }
-    const name = listingName(target, language);
-    const others = attention - 1;
-    const othersCopy =
-      others > 0
-        ? en
-          ? ` · ${others} more ${others === 1 ? "listing needs" : "listings need"} attention`
-          : ` · ${others === 1 ? "ešte 1 ponuka potrebuje" : others < 5 ? `ešte ${others} ponuky potrebujú` : `ešte ${others} ponúk potrebuje`} pozornosť`
-        : "";
-    if (target.status === "READY") {
-      return {
-        type: "ready",
-        title: en ? "Ready to publish" : "Pripravené na zverejnenie",
-        desc: `${name}${othersCopy}`,
-        action: en ? "Review and publish" : "Skontrolovať a zverejniť",
-        onClick: () => onOpenListing(target.id, { review: true }),
-        icon: CheckCircle2,
-        color: "text-green-600",
-        bg: "bg-green-50",
-        border: "border-green-200",
-        btnColor: "bg-green-600 text-white hover:bg-green-700",
-      };
-    }
-    if (target.status === "DRAFT") {
-      const step = nextStepTitle(target, language);
-      const percent = listingDisplayPercent(target);
-      return {
-        type: "draft",
-        title: en ? "Finish your listing" : "Dokončite svoju ponuku",
-        desc: `${name} · ${percent}%${step ? ` · ${en ? "Next" : "Ďalej"}: ${step}` : ""}${othersCopy}`,
-        action: en ? "Continue setup" : "Pokračovať v nastavení",
-        onClick: () => onOpenListing(target.id),
-        icon: AlertCircle,
-        color: "text-amber-600",
-        bg: "bg-amber-50",
-        border: "border-amber-200",
-        btnColor: "bg-amber-500 text-white hover:bg-amber-600",
-      };
-    }
-    return {
-      type: "all_good",
-      title: en ? "All listings are live" : "Všetky ponuky sú zverejnené",
-      desc: en
-        ? `${name} · Keep your listing details up to date.`
-        : `${name} · Udržujte údaje o ponukách aktuálne.`,
-      action: en ? "Manage listing" : "Spravovať ponuku",
-      onClick: () => onOpenListing(target.id),
-      icon: House,
-      color: "text-[#1E3E2B]",
-      bg: "bg-white",
-      border: "border-neutral-200",
-      btnColor: "bg-neutral-100 text-[#1E3E2B] hover:bg-neutral-200",
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
-  };
+  }, []);
 
-  const priority = getPriority();
+  const queuedRef = useRef(false);
 
-  const STATUS_TILES = [
-    { key: "DRAFT", label: { en: "Drafts", sk: "Koncepty" }, tone: "text-amber-600" },
-    { key: "READY", label: { en: "Ready", sk: "Pripravené" }, tone: "text-green-600" },
-    { key: "LIVE", label: { en: "Live", sk: "Zverejnené" }, tone: "text-[#1E3E2B]" },
-  ];
+  const load = useCallback(async ({ background = false } = {}) => {
+    // One request at a time; a change that arrives mid-flight queues exactly
+    // one follow-up so the last state always wins.
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+    inFlightRef.current = true;
+    if (background) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const result = await getHostDashboard();
+      if (!mountedRef.current) return;
+      setSummary(result);
+      setError(null);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setError(err);
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+        if (queuedRef.current) {
+          queuedRef.current = false;
+          load({ background: true });
+        }
+      }
+    }
+  }, []);
 
-  const quickActionClass =
-    "flex min-h-11 flex-col items-start p-5 bg-white border border-neutral-200 rounded-3xl hover:border-[#DFBA73] hover:shadow-md transition-all group text-left";
-  const quickIconClass =
-    "p-3 bg-neutral-50 text-neutral-600 rounded-2xl group-hover:bg-[#DFBA73]/10 group-hover:text-[#DFBA73] transition-colors mb-5";
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Re-aggregate after the first load whenever a module's data changed.
+  const firstSync = useRef(true);
+  useEffect(() => {
+    if (firstSync.current) {
+      firstSync.current = false;
+      return undefined;
+    }
+    const timer = setTimeout(() => load({ background: true }), 250);
+    return () => clearTimeout(timer);
+  }, [listings, reservations, conversations, load]);
+
+  const property = filters?.property ?? null;
+  const propertyKnown = !property || !listingsLoaded || listings.some((item) => item.id === property);
+  const activeProperty = propertyKnown ? property : null;
+
+  const listingsById = useMemo(() => new Map(listings.map((item) => [item.id, item])), [listings]);
+  const tasks = useMemo(() => buildTodayTasks(summary, { language, listingsById }), [summary, language, listingsById]);
+  const visible = useMemo(() => filterTasks(tasks, { property: activeProperty }), [tasks, activeProperty]);
+  const groups = useMemo(() => groupTasks(visible, language), [visible, language]);
+  const figures = useMemo(() => summaryFigures(summary, language), [summary, language]);
+  const hiddenByFilter = tasks.length - visible.length;
+
+  const todayLabel = useMemo(
+    () => new Date().toLocaleDateString(language === "en" ? "en-GB" : "sk-SK", { weekday: "long", day: "numeric", month: "long" }),
+    [language],
+  );
+
+  const header = (
+    <header className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-end sm:justify-between md:pt-4">
+      <div className="min-w-0">
+        <p className="text-[12px] font-bold uppercase tracking-wide text-neutral-500">{todayLabel}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-[#1E3E2B]">{t(language, "Today", "Dnes")}</h1>
+      </div>
+      <div className="flex items-center gap-2">
+        {listingsLoaded && listings.length > 1 && (
+          <label className="relative block flex-1 sm:flex-none">
+            <span className="sr-only">{t(language, "Property", "Ubytovanie")}</span>
+            <select
+              value={activeProperty ?? ""}
+              onChange={(event) => guardedNavigate(hostPaths.todayFor(event.target.value || null), { replace: true })}
+              className="min-h-12 w-full appearance-none rounded-xl border border-neutral-300 bg-white py-3 pl-4 pr-11 text-[15px] font-bold text-[#1E3E2B] outline-none focus:border-[#1E3E2B] focus:ring-2 focus:ring-[#1E3E2B]/15 sm:w-auto sm:min-w-[240px]"
+            >
+              <option value="">{t(language, "All properties", "Všetky ubytovania")}</option>
+              {listings.map((listing) => (
+                <option key={listing.id} value={listing.id}>{listingName(listing, language)}</option>
+              ))}
+            </select>
+            <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+          </label>
+        )}
+        {summary && (
+          <button
+            type="button"
+            onClick={() => load({ background: true })}
+            disabled={refreshing}
+            aria-label={t(language, "Refresh", "Obnoviť")}
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-300 bg-white text-[#1E3E2B] hover:bg-neutral-50 disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
+          </button>
+        )}
+      </div>
+    </header>
+  );
+
+  const wrap = "mx-auto max-w-4xl space-y-6 px-4 pb-8 animate-fadeIn md:px-0";
+
+  if (loading && !summary) {
+    return (
+      <div className={wrap}>
+        {header}
+        <div aria-busy="true" className="animate-pulse space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {[0, 1, 2].map((index) => <div key={index} className="h-20 rounded-2xl bg-neutral-200" />)}
+          </div>
+          {[0, 1, 2].map((index) => <div key={index} className="h-[72px] rounded-2xl border border-neutral-200 bg-white" />)}
+        </div>
+        <p className="sr-only" role="status">{t(language, "Loading today's overview", "Načítava sa dnešný prehľad")}</p>
+      </div>
+    );
+  }
+
+  if (error && !summary) {
+    return (
+      <div className={wrap}>
+        {header}
+        <div role="alert" className="flex flex-col items-center rounded-3xl border border-red-200 bg-red-50 p-8 text-center text-red-700 shadow-sm">
+          <AlertCircle size={30} className="mb-4" />
+          <h2 className="text-xl font-bold">{t(language, "We couldn't load today's overview", "Dnešný prehľad sa nepodarilo načítať")}</h2>
+          <p className="mt-2 max-w-sm text-[15px] text-red-600">{dashboardErrorText(error, language)}</p>
+          <button type="button" onClick={() => load()} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl border border-red-200 bg-white px-6 font-bold text-red-700 hover:bg-red-100">
+            <RefreshCw size={16} /> {t(language, "Retry", "Skúsiť znova")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-0 animate-fadeIn space-y-8">
-      <div className="pt-2 md:pt-4">
-        <h1 className="text-3xl font-bold text-[#1E3E2B] tracking-tight">
-          {en ? "Welcome back" : "Vitajte späť"}
-        </h1>
-        <p className="text-neutral-500 mt-2 text-[16px]">
-          {en ? "Here's what's happening with your properties today." : "Tu je prehľad vašich ubytovaní na dnes."}
+    <div className={wrap}>
+      {header}
+
+      {/* Every figure is a count the owning module reports; tap to open it. */}
+      <ul aria-label={t(language, "Summary", "Prehľad")} className="grid grid-cols-3 gap-2">
+        {figures.map((figure) => (
+          <li key={figure.id}>
+            <Link
+              {...linkProps(figure.href)}
+              className="flex min-h-20 flex-col justify-center rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-center shadow-sm transition-colors hover:border-[#DFBA73]"
+            >
+              <span className="text-2xl font-extrabold leading-none text-[#1E3E2B]">{figure.value}</span>
+              <span className="mt-1.5 text-[11px] font-bold uppercase leading-tight tracking-wide text-neutral-500">{figure.label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      {!propertyKnown && (
+        <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-800">
+          {t(language, "That property is no longer in your listings, so all properties are shown.", "Toto ubytovanie už nie je medzi vašimi ponukami, zobrazujú sa všetky.")}
         </p>
-      </div>
-
-      {showLoading ? (
-        <div className="w-full h-40 bg-neutral-100 rounded-3xl animate-pulse" aria-busy="true" />
-      ) : showError ? (
-        <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-red-700">
-              {en ? "We couldn't load your listings" : "Nepodarilo sa načítať vaše ponuky"}
-            </h2>
-            <p className="text-sm text-red-600 mt-1">
-              {en ? "Check your connection and try again." : "Skontrolujte pripojenie a skúste to znova."}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => refresh()}
-            disabled={loading}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-red-700 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            {en ? "Retry" : "Skúsiť znova"}
-          </button>
-        </div>
-      ) : priority ? (
-        <div className={`relative overflow-hidden rounded-3xl border ${priority.border} ${priority.bg} p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm transition-all`}>
-          <div className="flex items-start gap-5 min-w-0">
-            <div className={`p-4 rounded-2xl bg-white shadow-sm shrink-0 ${priority.color}`}>
-              <priority.icon size={32} />
-            </div>
-            <div className="min-w-0">
-              <h2 className={`text-xl font-bold mb-1.5 ${priority.type === "all_good" ? "text-[#1E3E2B]" : "text-neutral-900"}`}>{priority.title}</h2>
-              <p className="text-neutral-600 text-[15px] max-w-md leading-relaxed break-words">{priority.desc}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={priority.onClick}
-            className={`shrink-0 inline-flex min-h-12 items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-colors shadow-sm w-full md:w-auto ${priority.btnColor}`}
-          >
-            {priority.action}
-            <ArrowRight size={18} />
-          </button>
-        </div>
-      ) : null}
-
-      {loaded && listings.length > 0 && (
-        <div>
-          <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{en ? "Your listings" : "Vaše ponuky"}</h3>
-          <div className="grid grid-cols-3 gap-3 md:gap-4">
-            {STATUS_TILES.map((tile) => (
-              <button
-                type="button"
-                key={tile.key}
-                onClick={onOpenListings}
-                className="min-h-11 rounded-3xl border border-neutral-200 bg-white p-4 md:p-5 text-left hover:border-[#DFBA73] transition-colors"
-              >
-                <div className={`text-2xl md:text-3xl font-bold ${tile.tone}`}>{counts[tile.key]}</div>
-                <div className="text-[12px] md:text-[13px] font-semibold text-neutral-500 mt-1">{tile.label[language]}</div>
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
-      <div>
-        <h3 className="text-lg font-bold text-[#1E3E2B] mb-4 px-1">{en ? "Quick actions" : "Rýchle akcie"}</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          <button type="button" onClick={onOpenListings} className={quickActionClass}>
-            <div className={quickIconClass}><House size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Listings" : "Ponuky"}</span>
-            <span className="text-[13px] text-neutral-500 font-medium">
-              {!loaded
-                ? "…"
-                : en
-                  ? `${listings.length} ${listings.length === 1 ? "property" : "properties"}`
-                  : `${listings.length} ${listings.length === 1 ? "ubytovanie" : listings.length >= 2 && listings.length <= 4 ? "ubytovania" : "ubytovaní"}`}
-            </span>
-          </button>
-          <button type="button" onClick={onCreateListing} className={quickActionClass}>
-            <div className={quickIconClass}><Plus size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Add listing" : "Pridať ponuku"}</span>
-            <span className="text-[13px] text-neutral-500 font-medium">{en ? "Start a new draft" : "Nový koncept"}</span>
-          </button>
-          <Link href={HOST_GUIDE_PATH} className={`${quickActionClass} col-span-2 lg:col-span-1`}>
-            <div className={quickIconClass}><BookOpenText size={24} /></div>
-            <span className="font-bold text-[#1E3E2B] text-[15px] mb-1">{en ? "Host guide" : "Príručka hostiteľa"}</span>
-            <span className="text-[13px] text-neutral-500 font-medium">{en ? "Tips for a strong listing" : "Tipy pre kvalitnú ponuku"}</span>
-          </Link>
+      {error && summary && (
+        <p role="alert" className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-semibold text-red-700">
+          <AlertTriangle size={16} /> {t(language, "Couldn't refresh: ", "Nepodarilo sa obnoviť: ")}{dashboardErrorText(error, language)}
+        </p>
+      )}
+
+      {groups.length === 0 ? (
+        <div className="flex flex-col items-center rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50 text-green-600">
+            <CheckCircle2 size={30} />
+          </div>
+          <h2 className="text-xl font-bold text-[#1E3E2B]">
+            {activeProperty ? t(language, "Nothing to do for this property", "Pre toto ubytovanie nie je čo riešiť") : t(language, "Nothing needs your attention", "Nič nevyžaduje vašu pozornosť")}
+          </h2>
+          <p className="mt-2 max-w-sm text-[15px] text-neutral-600">
+            {t(language, "No open requests, calendar problems or unread messages right now.", "Momentálne žiadne otvorené žiadosti, problémy s kalendárom ani neprečítané správy.")}
+          </p>
+          {hiddenByFilter > 0 && (
+            <button type="button" onClick={() => guardedNavigate(hostPaths.today, { replace: true })} className="mt-5 inline-flex min-h-11 items-center gap-1 text-[14px] font-bold text-[#1E3E2B] underline-offset-4 hover:underline">
+              {t(language, `Show all properties (${hiddenByFilter})`, `Zobraziť všetky ubytovania (${hiddenByFilter})`)}
+            </button>
+          )}
         </div>
-      </div>
+      ) : (
+        groups.map((group) => (
+          <section key={group.group} aria-label={group.title} className="!py-0">
+            <h2 className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide text-neutral-500">
+              {group.title}
+              <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-[11px] text-neutral-700">{group.tasks.length}</span>
+            </h2>
+            <ul className="space-y-2">
+              {group.tasks.map((task) => (
+                <TaskCard key={task.id} task={task} language={language} />
+              ))}
+            </ul>
+          </section>
+        ))
+      )}
     </div>
   );
 }

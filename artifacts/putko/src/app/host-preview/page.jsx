@@ -6,7 +6,7 @@ import { AuthContext } from "../context/AuthContext";
 import { FormContext } from "../FormContext";
 import {
   ArrowLeft, LayoutDashboard, House, BookOpenText, CalendarDays, ClipboardList,
-  Menu as MenuIcon, Undo, ChevronRight, Plus, UserRound, Landmark, KeyRound,
+  Menu as MenuIcon, Undo, ChevronRight, Plus, UserRound, Landmark, KeyRound, MessageSquareText,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Link from "@/app/components/NextLink";
@@ -21,6 +21,9 @@ import ReservationsPage from "../host/reservations/ReservationsPage";
 import ReservationDetailPage from "../host/reservations/ReservationDetailPage";
 import HostProfilePage from "../host/profile/HostProfilePage";
 import HostPayoutsPage from "../host/payouts/HostPayoutsPage";
+import MessagesPage from "../host/messages/MessagesPage";
+import ConversationPage from "../host/messages/ConversationPage";
+import { HostMessagesProvider, useHostMessages } from "../host/messages/HostMessagesContext";
 import { HostReservationsProvider, useHostReservations } from "../host/reservations/HostReservationsContext";
 import {
   hostPaths,
@@ -42,7 +45,9 @@ export default function HostWorkspace() {
     <ProtectedRoute allowedRoles={["host"]}>
       <HostListingsProvider>
         <HostReservationsProvider>
-          <HostWorkspaceShell />
+          <HostMessagesProvider>
+            <HostWorkspaceShell />
+          </HostMessagesProvider>
         </HostReservationsProvider>
       </HostListingsProvider>
     </ProtectedRoute>
@@ -81,6 +86,9 @@ function HostWorkspaceShell() {
   // Open requests are the one thing a host must act on; the count sits on the
   // Reservations entry in both navigations.
   const openRequests = reservations.filter((item) => item.stage === "request").length;
+  // Unread guest messages come from the shared messages store, the same one
+  // the Messages screen and Today read from.
+  const { unreadTotal: unreadMessages, refresh: refreshMessages } = useHostMessages();
   const [switching, setSwitching] = useState(false);
 
   // Older traveler screens set a flag before redirecting to /host. Honour it
@@ -116,8 +124,14 @@ function HostWorkspaceShell() {
   // Reservations change on the server without this host (new requests, stays
   // becoming active), so entering the section always re-syncs quietly.
   useEffect(() => {
-    if (section === "reservations") refreshReservations({ background: true });
+    if (section === "reservations" || section === "today") refreshReservations({ background: true });
   }, [section, refreshReservations]);
+
+  // Guests write without this host doing anything, so the conversation list
+  // (and its unread count) re-syncs whenever Messages or Today is opened.
+  useEffect(() => {
+    if (section === "messages" || section === "today") refreshMessages({ background: true });
+  }, [section, refreshMessages]);
 
   // Mode switching removes the editor (ProtectedRoute re-evaluates the role),
   // so the unsaved-changes confirmation must come before the mode mutation.
@@ -160,7 +174,10 @@ function HostWorkspaceShell() {
     { id: "calendar", href: hostPaths.calendar, icon: CalendarDays, label: { en: "Calendar", sk: "Kalendár" } },
     // Reservations joined once accept/decline/cancel persisted and kept the
     // property calendar consistent (accepted stays block their nights).
-    { id: "reservations", href: hostPaths.reservations(), icon: ClipboardList, label: { en: "Reservations", sk: "Rezervácie" }, badge: openRequests },
+    { id: "reservations", href: hostPaths.reservations(), icon: ClipboardList, label: { en: "Reservations", sk: "Rezervácie" }, badge: openRequests, badgeLabel: { en: (n) => `${n} open requests`, sk: (n) => `Otvorené žiadosti: ${n}` } },
+    // Messages joined once host↔guest threads persisted with participant-only
+    // access, delivery/read state and a retry path for failed sends.
+    { id: "messages", href: hostPaths.messages(), icon: MessageSquareText, label: { en: "Messages", sk: "Správy" }, badge: unreadMessages, badgeLabel: { en: (n) => `${n} unread messages`, sk: (n) => `Neprečítané správy: ${n}` } },
   ];
   const MOBILE_TABS = [
     ...NAV_ITEMS,
@@ -214,7 +231,10 @@ function HostWorkspaceShell() {
     user?.name?.trim()?.charAt(0)?.toUpperCase() ||
     user?.email?.trim()?.charAt(0)?.toUpperCase() ||
     "H";
-  const isActive = (id) => section === id || (id === "reservations" && section === "reservation");
+  const isActive = (id) =>
+    section === id ||
+    (id === "reservations" && section === "reservation") ||
+    (id === "messages" && section === "conversation");
   const activeMobileLabel =
     MOBILE_TABS.find((tab) => isActive(tab.id))?.label[language] ||
     SECTION_LABELS[section]?.[language] ||
@@ -377,16 +397,16 @@ function HostWorkspaceShell() {
         return <HostProfilePage language={language} onOpenAccount={handleOpenAccount} openingAccount={switching} />;
       case "payouts":
         return <HostPayoutsPage language={language} />;
+      case "messages":
+        return <MessagesPage filters={location?.filters ?? null} language={language} />;
+      case "conversation":
+        return <ConversationPage key={location.conversationId} conversationId={location.conversationId} language={language} />;
       case "menu":
         return renderMobileMenu();
       case "today":
       default:
         return (
-          <Overview
-            onOpenListing={openListing}
-            onCreateListing={openNewListing}
-            onOpenListings={backToListings}
-          />
+          <Overview filters={location?.filters ?? null} />
         );
     }
   };
@@ -424,7 +444,7 @@ function HostWorkspaceShell() {
                       <span className="flex-1 text-[15px]">{tab.label[language]}</span>
                       {tab.badge > 0 && (
                         <span
-                          aria-label={language === "en" ? `${tab.badge} open requests` : `Otvorené žiadosti: ${tab.badge}`}
+                          aria-label={tab.badgeLabel[language === "en" ? "en" : "sk"](tab.badge)}
                           className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-bold ${active ? "bg-[#1E3E2B] text-[#DFBA73]" : "bg-[#DFBA73] text-[#1E3E2B]"}`}
                         >
                           {tab.badge}
@@ -552,7 +572,7 @@ function HostWorkspaceShell() {
                       <tab.icon size={26} className={active ? "text-[#DFBA73] fill-[#DFBA73]/20" : ""} strokeWidth={active ? 2.5 : 2} />
                       {tab.badge > 0 && (
                         <span
-                          aria-label={language === "en" ? `${tab.badge} open requests` : `Otvorené žiadosti: ${tab.badge}`}
+                          aria-label={tab.badgeLabel[language === "en" ? "en" : "sk"](tab.badge)}
                           className="absolute -right-2.5 -top-1.5 min-w-[18px] rounded-full bg-amber-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white"
                         >
                           {tab.badge > 9 ? "9+" : tab.badge}
