@@ -555,7 +555,13 @@ function HostWorkspaceShell() {
               </p>
               <p className="max-w-[230px] truncate text-sm font-bold text-[#1E3E2B]">{activeMobileLabel}</p>
             </div>
-            <img src="/putko.png" alt="Putko" className="h-6" />
+            <Link
+              {...linkProps("/")}
+              aria-label={language === "en" ? "Go to Putko home" : "Prejsť na domovskú stránku Putko"}
+              className="flex min-h-11 min-w-11 items-center justify-end rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3E2B] focus-visible:ring-offset-2"
+            >
+              <img src="/putko.png" alt="" className="h-6" />
+            </Link>
           </header>
         )}
 
@@ -567,7 +573,7 @@ function HostWorkspaceShell() {
         {/* Mobile Bottom Nav */}
         {!editorOpen && (
           <nav aria-label={language === "en" ? "Host navigation" : "Navigácia hostiteľa"} className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 pb-[env(safe-area-inset-bottom)] z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-around h-[72px] px-2">
+            <div className="grid h-[76px] grid-cols-6 items-stretch px-1">
               {MOBILE_TABS.map((tab) => {
                 const active = isActive(tab.id);
                 return (
@@ -575,9 +581,9 @@ function HostWorkspaceShell() {
                     key={tab.id}
                     {...linkProps(tab.href)}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-11 flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${active ? "text-[#1E3E2B]" : "text-neutral-400 hover:text-neutral-800"}`}
+                    className={`grid min-w-0 grid-rows-[30px_24px] content-center justify-items-center gap-1 px-0.5 text-center transition-colors ${active ? "text-[#1E3E2B]" : "text-neutral-400 hover:text-neutral-800"}`}
                   >
-                    <span className="relative">
+                    <span className="relative flex h-[30px] items-center justify-center">
                       <tab.icon size={26} className={active ? "text-[#DFBA73] fill-[#DFBA73]/20" : ""} strokeWidth={active ? 2.5 : 2} />
                       {tab.badge > 0 && (
                         <span
@@ -588,7 +594,9 @@ function HostWorkspaceShell() {
                         </span>
                       )}
                     </span>
-                    <span className={`text-[10px] uppercase tracking-wide ${active ? "font-bold" : "font-semibold"}`}>{tab.label[language]}</span>
+                    <span className={`block h-6 w-full text-center text-[9px] uppercase leading-[11px] tracking-[-0.01em] [overflow-wrap:anywhere] min-[410px]:text-[10px] min-[410px]:tracking-normal ${active ? "font-bold" : "font-semibold"}`}>
+                      {tab.label[language]}
+                    </span>
                   </Link>
                 );
               })}

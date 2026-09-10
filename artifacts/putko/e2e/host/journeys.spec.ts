@@ -254,4 +254,53 @@ test.describe('Host journeys', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
+
+  test('mobile Host chrome stays balanced and links home', async ({ page, request }, testInfo) => {
+    const host = await createHostAccount(request, `mobile-chrome-${testInfo.project.name}`);
+    await injectSession(page, host, 'sk');
+    await gotoHost(page, '/host');
+
+    const mobileNav = page.locator('nav.fixed');
+    const mobileHomeLink = page.locator('header').getByRole('link', { name: /Putko/i });
+
+    if (testInfo.project.name === 'desktop') {
+      await expect(mobileNav).toBeHidden();
+      await expect(mobileHomeLink).toBeHidden();
+      await expect(page.locator('aside').getByRole('navigation', { name: /Navigácia hostiteľa/i })).toBeVisible();
+      return;
+    }
+
+    await expect(mobileNav).toBeVisible();
+    await expect(mobileHomeLink).toBeVisible();
+
+    for (const language of ['sk', 'en'] as const) {
+      await page.evaluate((lang) => localStorage.setItem('appLanguage', lang), language);
+      await page.reload();
+
+      const tabs = mobileNav.getByRole('link');
+      await expect(tabs).toHaveCount(6);
+      const geometry = await tabs.evaluateAll((links) =>
+        links.map((link) => {
+          const icon = link.querySelector('svg')?.getBoundingClientRect();
+          const label = link.querySelector<HTMLElement>(':scope > span:last-child');
+          const labelRect = label?.getBoundingClientRect();
+          const box = link.getBoundingClientRect();
+          return {
+            width: box.width,
+            iconTop: icon?.top,
+            labelTop: labelRect?.top,
+            labelFits: label ? label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight : false,
+          };
+        }),
+      );
+
+      expect(Math.max(...geometry.map(({ width }) => width)) - Math.min(...geometry.map(({ width }) => width))).toBeLessThan(0.5);
+      expect(new Set(geometry.map(({ iconTop }) => iconTop)).size).toBe(1);
+      expect(new Set(geometry.map(({ labelTop }) => labelTop)).size).toBe(1);
+      expect(geometry.every(({ labelFits }) => labelFits)).toBeTruthy();
+    }
+
+    await mobileHomeLink.click();
+    await expect(page).toHaveURL(/\/$/);
+  });
 });
