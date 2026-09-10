@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { AuthContext } from "../context/AuthContext";
 import { FormContext } from "../FormContext";
 import {
-  ArrowLeft, LayoutDashboard, House, BookOpenText,
+  ArrowLeft, LayoutDashboard, House, BookOpenText, CalendarDays,
   Menu as MenuIcon, Undo, ChevronRight, Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -15,6 +15,8 @@ import ProtectedRoute from "../ProtectedRoute";
 import Overview from "./components/Overview";
 import AccommodationsList from "./components/AccommodationsList";
 import AccommodationForm from "./components/AccommodationForm";
+import HostCalendarPage from "../host/calendar/HostCalendarPage";
+import CalendarHome from "../host/calendar/CalendarHome";
 import {
   hostPaths,
   resolveHostLocation,
@@ -130,6 +132,9 @@ function HostWorkspaceShell() {
   const NAV_ITEMS = [
     { id: "today", href: hostPaths.today, icon: LayoutDashboard, label: { en: "Today", sk: "Dnes" } },
     { id: "listings", href: hostPaths.listings, icon: House, label: { en: "Listings", sk: "Ponuky" } },
+    // Calendar returned to primary navigation once per-property availability
+    // (blocks + feed status) persisted and stayed isolated per listing.
+    { id: "calendar", href: hostPaths.calendar, icon: CalendarDays, label: { en: "Calendar", sk: "Kalendár" } },
   ];
   const MOBILE_TABS = [
     ...NAV_ITEMS,
@@ -286,12 +291,21 @@ function HostWorkspaceShell() {
           <AccommodationForm
             accommodationId={location?.listingId ?? null}
             openReview={Boolean(location?.review)}
+            openStep={location?.step ?? null}
             onBack={backToListings}
             onCreated={(id) => rawNavigate(hostPaths.listing(id), { replace: true })}
             onReviewDismiss={() => {
               if (location?.listingId) rawNavigate(hostPaths.listing(location.listingId), { replace: true });
             }}
           />
+        );
+      case "calendar":
+        // Keyed by listing id so switching properties remounts with fresh
+        // local state; nothing from the previous property can linger.
+        return location?.listingId ? (
+          <HostCalendarPage key={location.listingId} listingId={location.listingId} language={language} />
+        ) : (
+          <CalendarHome language={language} />
         );
       case "menu":
         return renderMobileMenu();

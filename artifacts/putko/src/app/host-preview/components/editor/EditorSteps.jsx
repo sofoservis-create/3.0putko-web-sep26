@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { CalendarIcon, Info, Landmark, Link2, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Info, Landmark, Link2, PauseCircle, Plus, Trash2 } from "lucide-react";
+import Link from "@/app/components/NextLink";
 import { fieldElementId, isHttpUrl } from "../../../host/hostEditorValidation";
 import {
   CheckCard,
@@ -400,7 +401,7 @@ function Policies({ data, errors, language, onChange }) {
   );
 }
 
-function Calendar({ data, errors, language, setField }) {
+function Calendar({ data, errors, language, setField, calendarLinkProps }) {
   const feeds = Array.isArray(data.calendarFeeds) ? data.calendarFeeds : [];
   const choice = data.calendarChoice === "connect" ? "connect" : data.calendarChoice === "none" ? "none" : "";
   const choiceId = fieldElementId("calendarChoice");
@@ -413,6 +414,18 @@ function Calendar({ data, errors, language, setField }) {
   };
   const removeFeed = (index) => setField("calendarFeeds", feeds.filter((_, i) => i !== index));
   const addFeed = () => setField("calendarFeeds", [...feeds, { label: "", url: "" }]);
+  // Links with a saved URL survive a switch to "manual only" (they are paused,
+  // not deleted), so switching away from "connect" deserves a confirmation.
+  const savedLinks = feeds.filter((feed) => typeof feed?.url === "string" && feed.url.trim()).length;
+  const [confirmManual, setConfirmManual] = useState(false);
+  const chooseOption = (value) => {
+    if (value === "none" && choice === "connect" && savedLinks > 0) {
+      setConfirmManual(true);
+      return;
+    }
+    setConfirmManual(false);
+    setField("calendarChoice", value);
+  };
 
   const options = [
     {
@@ -451,7 +464,7 @@ function Calendar({ data, errors, language, setField }) {
                   name="calendarChoice"
                   value={option.value}
                   checked={checked}
-                  onChange={() => setField("calendarChoice", option.value)}
+                  onChange={() => chooseOption(option.value)}
                   aria-invalid={errors.calendarChoice ? true : undefined}
                   className="mt-0.5 h-6 w-6 shrink-0 border-neutral-300 text-[#DFBA73] focus:ring-[#DFBA73] scroll-mb-40"
                 />
@@ -464,6 +477,33 @@ function Calendar({ data, errors, language, setField }) {
           })}
         </div>
         <FieldError id={choiceErrorId} message={errors.calendarChoice} />
+        {confirmManual && (
+          <div role="alertdialog" aria-labelledby={`${choiceId}-confirm`} className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p id={`${choiceId}-confirm`} className="flex items-start gap-2 text-[13px] font-semibold leading-5 text-amber-900">
+              <PauseCircle size={16} className="mt-0.5 shrink-0" />
+              {t(
+                language,
+                `Switch to manual only? Your ${savedLinks} ${savedLinks === 1 ? "link stays" : "links stay"} saved but paused, and any dates imported from ${savedLinks === 1 ? "it open" : "them open"} up again for booking.`,
+                `Prepnúť len na manuálne? ${savedLinks === 1 ? "Váš odkaz zostane uložený, ale pozastavený" : `Vaše odkazy (${savedLinks}) zostanú uložené, ale pozastavené`} a termíny z ${savedLinks === 1 ? "neho" : "nich"} importované sa opäť uvoľnia na rezerváciu.`,
+              )}
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button type="button" onClick={() => setConfirmManual(false)} className="min-h-11 flex-1 rounded-xl border border-neutral-300 bg-white px-4 text-[14px] font-bold text-[#1E3E2B]">
+                {t(language, "Keep connected", "Ponechať pripojené")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmManual(false);
+                  setField("calendarChoice", "none");
+                }}
+                className="min-h-11 flex-1 rounded-xl bg-amber-700 px-4 text-[14px] font-bold text-white"
+              >
+                {t(language, "Switch to manual", "Prepnúť na manuálne")}
+              </button>
+            </div>
+          </div>
+        )}
       </fieldset>
 
       {choice === "connect" && (
@@ -473,8 +513,8 @@ function Calendar({ data, errors, language, setField }) {
             <p className="mt-1 text-[13px] font-medium leading-5 text-neutral-500">
               {t(
                 language,
-                "Paste the export link from the other platform (it usually ends with .ics). Links are saved with the listing; automatic syncing is set up in the calendar section later.",
-                "Vložte exportný odkaz z druhej platformy (zvyčajne končí na .ics). Odkazy sa uložia s ponukou; automatická synchronizácia sa nastaví neskôr v sekcii Kalendár.",
+                "Paste the export link from the other platform (it usually ends with .ics). Links are saved with the listing. Dates are imported when you fetch the link in this listing's calendar — there is no automatic background sync yet.",
+                "Vložte exportný odkaz z druhej platformy (zvyčajne končí na .ics). Odkazy sa uložia s ponukou. Termíny sa importujú, keď odkaz načítate v kalendári tejto ponuky — automatická synchronizácia na pozadí zatiaľ nie je.",
               )}
             </p>
           </div>
@@ -542,12 +582,47 @@ function Calendar({ data, errors, language, setField }) {
         </div>
       )}
 
-      {choice === "none" && (
+      {choice === "none" && savedLinks > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-medium leading-5 text-amber-900">
+          <PauseCircle size={18} className="mt-0.5 shrink-0" />
+          <span>
+            {t(
+              language,
+              `${savedLinks} saved calendar ${savedLinks === 1 ? "link is" : "links are"} paused: nothing is imported while availability is manual only. Choose "Connect calendar links" to use ${savedLinks === 1 ? "it" : "them"} again.`,
+              `${savedLinks === 1 ? "1 uložený odkaz na kalendár je pozastavený" : `${savedLinks} uložené odkazy na kalendár sú pozastavené`}: kým je dostupnosť len manuálna, nič sa neimportuje. Ak ${savedLinks === 1 ? "ho" : "ich"} chcete znova používať, vyberte „Pripojiť odkazy na kalendár“.`,
+            )}
+          </span>
+        </div>
+      )}
+      {choice === "none" && savedLinks === 0 && (
         <div className="flex items-start gap-3 rounded-2xl bg-neutral-50 px-4 py-3 text-[13px] font-medium leading-5 text-neutral-600">
           <CalendarIcon size={18} className="mt-0.5 shrink-0 text-[#1E3E2B]" />
           <span>
             {t(language, "You can add calendar links later from the listing's calendar without redoing setup.", "Odkazy na kalendár môžete pridať neskôr v kalendári ponuky bez opakovania nastavenia.")}
           </span>
+        </div>
+      )}
+
+      {/* Same data as the ongoing calendar page: links here, blocked dates and
+          fetch status there. Only offered once the listing exists on the server. */}
+      {calendarLinkProps && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#DFBA73]/60 bg-[#F8F4EA] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 text-[13px] font-medium leading-5 text-neutral-700">
+            <CalendarIcon size={18} className="mt-0.5 shrink-0 text-[#1E3E2B]" />
+            <span>
+              {t(
+                language,
+                "Blocked dates and the fetch status of these links live in this listing's calendar. Save your changes here first.",
+                "Blokované termíny a stav načítania týchto odkazov nájdete v kalendári tejto ponuky. Najprv tu uložte zmeny.",
+              )}
+            </span>
+          </div>
+          <Link
+            {...calendarLinkProps}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-[#1E3E2B] px-4 text-[14px] font-bold text-[#1E3E2B] transition-colors hover:bg-[#1E3E2B]/5"
+          >
+            {t(language, "Open calendar", "Otvoriť kalendár")}
+          </Link>
         </div>
       )}
     </div>

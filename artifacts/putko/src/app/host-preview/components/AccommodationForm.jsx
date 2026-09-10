@@ -30,6 +30,7 @@ import {
   validateStep,
 } from "../../host/hostEditorValidation";
 import { useHostNavigation, useLeaveGuard } from "../../host/HostNavigationGuard";
+import { hostPaths } from "../../host/hostRoutes";
 import EditorStep from "./editor/EditorSteps";
 import { DesktopStepSidebar, MobileEditorHeader, SaveStatus, StepSheet } from "./editor/EditorStepper";
 import PublishReviewDialog from "./editor/PublishReviewDialog";
@@ -64,6 +65,32 @@ const serializeData = (data) => {
   return JSON.stringify(rest);
 };
 
+/** JSON with sorted object keys, so equal values compare equal regardless of key order. */
+const stableJson = (value) =>
+  JSON.stringify(value, (_key, child) =>
+    child && typeof child === "object" && !Array.isArray(child)
+      ? Object.fromEntries(Object.keys(child).sort().map((key) => [key, child[key]]))
+      : child,
+  );
+
+/**
+ * Only the top-level fields that changed since the last successful save.
+ * The server deep-merges patches, so leaving a field out keeps whatever is
+ * stored — including changes another screen (the property calendar's feed
+ * list) made while this editor was open. Nothing this editor did not touch
+ * can be overwritten by a later autosave.
+ */
+export const changedFields = (snapshot, lastSaved) => {
+  const patch = {};
+  for (const [key, value] of Object.entries(snapshot || {})) {
+    if (key === LAST_VISITED_STEP_KEY) continue;
+    if (!(key in (lastSaved || {})) || stableJson(value) !== stableJson(lastSaved[key])) {
+      patch[key] = value;
+    }
+  }
+  return patch;
+};
+
 const focusField = (field) => {
   if (!field || typeof document === "undefined") return;
   const element = document.getElementById(fieldElementId(field));
@@ -78,6 +105,9 @@ export default function AccommodationForm({
   onCreated,
   openReview = false,
   onReviewDismiss,
+  // Step id from `?step=` — opens the editor on that step (e.g. the calendar
+  // page linking back to step 8) instead of the remembered resume step.
+  openStep = null,
 }) {
   const { lang } = useContext(FormContext);
   const language = lang || "sk";
@@ -253,7 +283,10 @@ export default function AccommodationForm({
         const res = await getHostAccommodation(id);
         if (session !== sessionRef.current) return;
         applyServerListing(res);
-        if (resume) setCurrentStep(resumeStepIndex(res));
+        if (resume) {
+          const requested = openStep ? STEPS.findIndex((step) => step.id === openStep) : -1;
+          setCurrentStep(requested >= 0 ? requested : resumeStepIndex(res));
+        }
       }
     } catch (err) {
       if (session !== sessionRef.current) return;
@@ -293,7 +326,7 @@ export default function AccommodationForm({
       // reopens the draft on the same step. Stored inside the JSON payload;
       // the server ignores it for completion and publishing.
       const res = await saveListing(idToSave, {
-        ...snapshot,
+        ...changedFields(snapshot, JSON.parse(lastSavedJsonRef.current)),
         [LAST_VISITED_STEP_KEY]: stepForPayload,
       });
       if (session !== sessionRef.current) return false;
@@ -345,6 +378,9 @@ export default function AccommodationForm({
   // mean the edits were never saved, and "Save and leave" saves explicitly.
   const hostNavigation = useHostNavigation();
   const leaveDialogOpen = Boolean(hostNavigation?.pending);
+  // Links out of the editor (e.g. to the listing calendar) must run through
+  // the same guard so unsaved edits are never lost silently.
+  const linkProps = hostNavigation?.linkProps ?? ((href) => ({ href }));
   useEffect(() => {
     if (loading || saving || saveState.phase === "failed" || leaveDialogOpen) return undefined;
     if (!dirty && !stepPointerStale) return undefined;
@@ -653,6 +689,7 @@ export default function AccommodationForm({
               toggleAmenity={handleAmenityToggle}
               addPhoto={handlePhotoAdd}
               removePhoto={handlePhotoRemove}
+              calendarLinkProps={localId ? linkProps(hostPaths.listingCalendar(localId)) : null}
             />
           </div>
 

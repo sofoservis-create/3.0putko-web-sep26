@@ -259,6 +259,58 @@ describe("AccommodationForm save lifecycle and validation", () => {
     expect(screen.getAllByText(/^saved/i).length).toBeGreaterThan(0);
   });
 
+  it("saves only the fields it changed, so a feed list edited on the calendar page survives an editor autosave", async () => {
+    const stored = {
+      ...serverListing("A", "Alpha", "DRAFT"),
+      data: {
+        name: "Alpha",
+        propertyType: "apartment",
+        calendarChoice: "connect",
+        calendarFeeds: [{ label: "Airbnb", url: "https://example.com/a.ics", id: "f1" }],
+      },
+    };
+    getHostAccommodation.mockResolvedValueOnce(stored);
+    // Server copy: key order differs from the client's and the calendar page
+    // added a second feed meanwhile.
+    const serverFeeds = [
+      { id: "f1", label: "Airbnb", url: "https://example.com/a.ics" },
+      { id: "f2", label: "Booking", url: "https://example.com/b.ics" },
+    ];
+    storeMocks.saveListing.mockImplementation(async (id, patch) => ({
+      ...stored,
+      data: { ...stored.data, ...patch, calendarFeeds: serverFeeds },
+    }));
+
+    renderEditor({ accommodationId: "A" });
+    await act(async () => {});
+
+    await act(async () => {
+      fireEvent.change(nameInput(), { target: { value: "Alpha Lodge" } });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600);
+    });
+    expect(storeMocks.saveListing).toHaveBeenCalledTimes(1);
+    const firstPatch = storeMocks.saveListing.mock.calls[0][1];
+    expect(firstPatch.name).toBe("Alpha Lodge");
+    expect(firstPatch).not.toHaveProperty("calendarFeeds");
+    expect(firstPatch).not.toHaveProperty("calendarChoice");
+    expect(firstPatch).not.toHaveProperty("propertyType");
+
+    // A second edit after adopting the server copy still leaves the (now
+    // two-entry) feed list alone.
+    await act(async () => {
+      fireEvent.change(nameInput(), { target: { value: "Alpha Lodge II" } });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600);
+    });
+    expect(storeMocks.saveListing).toHaveBeenCalledTimes(2);
+    const secondPatch = storeMocks.saveListing.mock.calls[1][1];
+    expect(secondPatch.name).toBe("Alpha Lodge II");
+    expect(secondPatch).not.toHaveProperty("calendarFeeds");
+  });
+
   it("keeps entered data after a failed save and retries on demand", async () => {
     getHostAccommodation.mockResolvedValueOnce(serverListing("A", "Alpha", "DRAFT"));
     storeMocks.saveListing.mockRejectedValueOnce(new Error("offline"));
@@ -368,11 +420,10 @@ describe("AccommodationForm save lifecycle and validation", () => {
     expect(screen.getByRole("button", { name: /publish listing/i }).disabled).toBe(false);
   });
   it("keeps decimal and large prices exactly as entered or stored; blur never rewrites them", async () => {
-    getHostAccommodation.mockResolvedValueOnce({
-      ...serverListing("A", "Alpha", "DRAFT"),
-      data: { name: "Alpha", propertyType: "apartment", description: "x", lastVisitedStep: "pricing", nightlyPrice: 15000, minNights: 400 },
-    });
-    storeMocks.saveListing.mockImplementation(async (id, data) => ({ ...serverListing(id, data.name, "DRAFT"), data }));
+    const storedData = { name: "Alpha", propertyType: "apartment", description: "x", lastVisitedStep: "pricing", nightlyPrice: 15000, minNights: 400 };
+    getHostAccommodation.mockResolvedValueOnce({ ...serverListing("A", "Alpha", "DRAFT"), data: storedData });
+    // Like the real server: the patch is merged into the stored payload.
+    storeMocks.saveListing.mockImplementation(async (id, patch) => ({ ...serverListing(id, "Alpha", "DRAFT"), data: { ...storedData, ...patch } }));
 
     renderEditor({ accommodationId: "A" });
     await act(async () => {});
@@ -405,7 +456,10 @@ describe("AccommodationForm save lifecycle and validation", () => {
       await vi.advanceTimersByTimeAsync(1600);
     });
     expect(storeMocks.saveListing).toHaveBeenCalledTimes(1);
-    expect(storeMocks.saveListing.mock.calls[0][1]).toMatchObject({ nightlyPrice: 89.99, minNights: 400 });
+    expect(storeMocks.saveListing.mock.calls[0][1]).toMatchObject({ nightlyPrice: 89.99 });
+    // The untouched minNights is not re-sent (sparse patches), and was never rewritten.
+    expect(storeMocks.saveListing.mock.calls[0][1]).not.toHaveProperty("minNights");
+    expect(nights.value).toBe("400");
   });
 
   it("shows an inline error for a zero price instead of substituting a value", async () => {

@@ -158,3 +158,35 @@ export const parseAccommodationData = (
   }
   return { data: candidate };
 };
+export type AccommodationStatus = "DRAFT" | "READY" | "LIVE";
+
+/**
+ * Status after a payload change: a LIVE listing stays LIVE while it remains
+ * complete, otherwise completeness decides between READY and DRAFT.
+ */
+export const nextAccommodationStatus = (
+  current: AccommodationStatus,
+  data: AccommodationData,
+): AccommodationStatus => {
+  const { canPublish } = accommodationCompletion(data);
+  if (current === "LIVE" && canPublish) return "LIVE";
+  return canPublish ? "READY" : "DRAFT";
+};
+
+export type AccommodationRow = {
+  id: string;
+  data: AccommodationData;
+  status: AccommodationStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** The accommodation as every host endpoint returns it (owner never leaks). */
+export const publicAccommodation = (accommodation: AccommodationRow) => ({
+  id: accommodation.id,
+  data: accommodation.data,
+  status: accommodation.status,
+  createdAt: accommodation.createdAt,
+  updatedAt: accommodation.updatedAt,
+  ...accommodationCompletion(accommodation.data),
+});

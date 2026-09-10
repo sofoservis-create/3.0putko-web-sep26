@@ -1,5 +1,4 @@
 import {
-  createHash,
   randomBytes,
   scrypt as nodeScrypt,
   timingSafeEqual,
@@ -30,12 +29,21 @@ import {
   testHostAccommodationsTable,
 } from "@workspace/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter } from "express";
+import {
+  accommodationIdParam,
+  getAuthenticatedGuest,
+  hashToken,
+  requireHostGuest,
+} from "../lib/test-guest-auth";
 import {
   accommodationCompletion,
   mergeAccommodationData,
+  nextAccommodationStatus,
   parseAccommodationData,
+  publicAccommodation,
 } from "../lib/test-host-accommodation";
+import { normalizeCalendarFeeds } from "../lib/test-host-calendar";
 
 const router: IRouter = Router();
 const scrypt = promisify(nodeScrypt);
@@ -79,9 +87,6 @@ const messages = {
 
 const getMessages = (lang: unknown) => messages[lang === "en" ? "en" : "sk"];
 
-const hashToken = (token: string) =>
-  createHash("sha256").update(token).digest("hex");
-
 const hashPassword = async (password: string) => {
   const salt = randomBytes(16);
   const derivedKey = (await scrypt(password, salt, 64)) as Buffer;
@@ -116,82 +121,12 @@ const toPublicGuest = (
     hostActivatedAt: guest.hostActivatedAt?.toISOString() ?? null,
   });
 
-const getAuthenticatedGuest = async (req: Request) => {
-  const authorization = req.get("authorization");
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : "";
-  if (!token.startsWith("test_session_")) return null;
-
-  const [result] = await db
-    .select({ guest: testGuestsTable, session: testGuestSessionsTable })
-    .from(testGuestSessionsTable)
-    .innerJoin(
-      testGuestsTable,
-      eq(testGuestSessionsTable.guestId, testGuestsTable.id),
-    )
-    .where(eq(testGuestSessionsTable.tokenHash, hashToken(token)))
-    .limit(1);
-
-  if (!result || result.session.expiresAt.getTime() <= Date.now()) {
-    if (result) {
-      await db
-        .delete(testGuestSessionsTable)
-        .where(eq(testGuestSessionsTable.id, result.session.id));
-    }
-    return null;
-  }
-  return result;
-};
-
 const favoriteIds = async (guestId: string) => {
   const rows = await db
     .select({ accommodationId: testGuestFavoritesTable.accommodationId })
     .from(testGuestFavoritesTable)
     .where(eq(testGuestFavoritesTable.guestId, guestId));
   return rows.map((row) => row.accommodationId);
-};
-
-const getHostGuest = async (req: Request) => {
-  const auth = await getAuthenticatedGuest(req);
-  if (!auth) return { error: "unauthorized" as const };
-  if (!auth.guest.hostActivatedAt) return { error: "hostRequired" as const };
-  return { auth };
-};
-
-const accommodationId = (req: Request) => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  return typeof raw === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      raw,
-    )
-    ? raw
-    : null;
-};
-
-const publicAccommodation = (
-  accommodation: typeof testHostAccommodationsTable.$inferSelect,
-) => ({
-  id: accommodation.id,
-  data: accommodation.data,
-  status: accommodation.status,
-  createdAt: accommodation.createdAt,
-  updatedAt: accommodation.updatedAt,
-  ...accommodationCompletion(accommodation.data),
-});
-
-const requireHostGuest = async (req: Request, res: Response) => {
-  const result = await getHostGuest(req);
-  if ("auth" in result) return result.auth;
-  res
-    .status(result.error === "unauthorized" ? 401 : 403)
-    .json({
-      message:
-        result.error === "unauthorized"
-          ? messages.sk.unauthorized
-          : messages.sk.hostRequired,
-    });
-  return null;
 };
 
 router.use((_req, res, next) => {
@@ -563,12 +498,13 @@ router.post(
       res.status(400).json({ message: parsed.error });
       return;
     }
-    const completion = accommodationCompletion(parsed.data);
+    const data = normalizeCalendarFeeds(parsed.data);
+    const completion = accommodationCompletion(data);
     const [accommodation] = await db
       .insert(testHostAccommodationsTable)
       .values({
         ownerId: auth.guest.id,
-        data: parsed.data,
+        data,
         status: completion.canPublish ? "READY" : "DRAFT",
       })
       .returning();
@@ -581,7 +517,7 @@ router.get(
   async (req, res): Promise<void> => {
     const auth = await requireHostGuest(req, res);
     if (!auth) return;
-    const id = accommodationId(req);
+    const id = accommodationIdParam(req);
     if (!id) {
       res.status(400).json({ message: "Invalid accommodation id" });
       return;
@@ -609,7 +545,7 @@ router.patch(
   async (req, res): Promise<void> => {
     const auth = await requireHostGuest(req, res);
     if (!auth) return;
-    const id = accommodationId(req);
+    const id = accommodationIdParam(req);
     const parsed = parseAccommodationData(req.body);
     if (!id) {
       res.status(400).json({ message: "Invalid accommodation id" });
@@ -619,35 +555,39 @@ router.patch(
       res.status(400).json({ message: parsed.error });
       return;
     }
-    const [existing] = await db
-      .select()
-      .from(testHostAccommodationsTable)
-      .where(
-        and(
-          eq(testHostAccommodationsTable.id, id),
-          eq(testHostAccommodationsTable.ownerId, auth.guest.id),
-        ),
-      )
-      .limit(1);
-    if (!existing) {
+    // Read, merge and write under a row lock so an editor save can never
+    // interleave with a calendar-page feed change and overwrite it with the
+    // payload it read a moment earlier. The editor only sends the fields it
+    // changed, so unrelated saves leave `calendarFeeds` untouched.
+    const accommodation = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(testHostAccommodationsTable)
+        .where(
+          and(
+            eq(testHostAccommodationsTable.id, id),
+            eq(testHostAccommodationsTable.ownerId, auth.guest.id),
+          ),
+        )
+        .for("update");
+      if (!existing) return null;
+      const data = normalizeCalendarFeeds(
+        mergeAccommodationData(existing.data, parsed.data),
+      );
+      const [updated] = await tx
+        .update(testHostAccommodationsTable)
+        .set({
+          data,
+          status: nextAccommodationStatus(existing.status, data),
+        })
+        .where(eq(testHostAccommodationsTable.id, id))
+        .returning();
+      return updated;
+    });
+    if (!accommodation) {
       res.status(404).json({ message: "Accommodation not found" });
       return;
     }
-    const data = mergeAccommodationData(existing.data, parsed.data);
-    const completion = accommodationCompletion(data);
-    const [accommodation] = await db
-      .update(testHostAccommodationsTable)
-      .set({
-        data,
-        status:
-          existing.status === "LIVE" && completion.canPublish
-            ? "LIVE"
-            : completion.canPublish
-              ? "READY"
-              : "DRAFT",
-      })
-      .where(eq(testHostAccommodationsTable.id, id))
-      .returning();
     res.json(publicAccommodation(accommodation));
   },
 );
@@ -657,7 +597,7 @@ router.delete(
   async (req, res): Promise<void> => {
     const auth = await requireHostGuest(req, res);
     if (!auth) return;
-    const id = accommodationId(req);
+    const id = accommodationIdParam(req);
     if (!id) {
       res.status(400).json({ message: "Invalid accommodation id" });
       return;
@@ -684,7 +624,7 @@ router.post(
   async (req, res): Promise<void> => {
     const auth = await requireHostGuest(req, res);
     if (!auth) return;
-    const id = accommodationId(req);
+    const id = accommodationIdParam(req);
     if (!id) {
       res.status(400).json({ message: "Invalid accommodation id" });
       return;

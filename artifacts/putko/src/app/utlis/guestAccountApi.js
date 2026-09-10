@@ -18,6 +18,8 @@ const testGuestRequest = async (path, options = {}) => {
   if (!response.ok) {
     const error = new Error(data.message || "Request failed");
     error.status = response.status;
+    // Machine-readable reason (calendar routes) so the UI can localize it.
+    if (typeof data.code === "string") error.code = data.code;
     throw error;
   }
   return data;
@@ -73,3 +75,25 @@ export const announceFavoritesChanged = (favorites) => {
     new CustomEvent("putko:favorites-changed", { detail: favorites }),
   );
 };
+// Per-property availability (manual blocks + iCal feed status). Every
+// mutation returns the full calendar snapshot for that property.
+const calendarPath = (id, suffix = "") =>
+  `/host-accommodations/${encodeURIComponent(id)}/calendar${suffix}`;
+export const getHostCalendar = (id) => testGuestRequest(calendarPath(id));
+export const blockHostCalendarRange = (id, range) =>
+  testGuestRequest(calendarPath(id, "/blocks"), { method: "POST", body: JSON.stringify(range) });
+export const unblockHostCalendarRange = (id, range) =>
+  testGuestRequest(calendarPath(id, "/unblock"), { method: "POST", body: JSON.stringify(range) });
+export const addHostCalendarFeed = (id, feed) =>
+  testGuestRequest(calendarPath(id, "/feeds"), { method: "POST", body: JSON.stringify(feed) });
+export const updateHostCalendarFeed = (id, feedId, patch) =>
+  testGuestRequest(calendarPath(id, `/feeds/${encodeURIComponent(feedId)}`), {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+export const removeHostCalendarFeed = (id, feedId) =>
+  testGuestRequest(calendarPath(id, `/feeds/${encodeURIComponent(feedId)}`), { method: "DELETE" });
+export const setHostCalendarMode = (id, calendarChoice) =>
+  testGuestRequest(`${calendarPath(id)}/mode`, { method: "POST", body: JSON.stringify({ calendarChoice }) });
+export const fetchHostCalendarFeed = (id, feedId) =>
+  testGuestRequest(calendarPath(id, `/feeds/${encodeURIComponent(feedId)}/fetch`), { method: "POST" });
