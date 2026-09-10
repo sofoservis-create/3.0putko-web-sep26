@@ -151,12 +151,15 @@ const Footer = ({ compactMobile = false }) => {
             © {year} Putko. {t.AllRightsReserved || "Všetky práva vyhradené."}
           </p>
 
-          <div className="grid w-full grid-cols-2 items-start gap-x-4 sm:flex sm:w-auto sm:items-center sm:gap-x-6">
+          <div className="flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:w-auto sm:justify-end sm:gap-x-6">
             <Link href="/Privacy-Policy" className="text-center text-white/50 hover:text-white font-inter text-sm leading-snug transition-colors py-1 sm:text-left">
               {t.PrivacyPolicy || "Ochrana osobných údajov"}
             </Link>
             <Link href="/Terms-&-Condition" className="text-center text-white/50 hover:text-white font-inter text-sm leading-snug transition-colors py-1 sm:text-left">
               {t.TermCondition || "Obchodné podmienky"}
+            </Link>
+            <Link href="/destination-photo-credits.html" className="text-center text-white/50 hover:text-white font-inter text-sm leading-snug transition-colors py-1 sm:text-left">
+              {language === "en" ? "Photo credits and licences" : "Autori fotografií a licencie"}
             </Link>
           </div>
         </div>

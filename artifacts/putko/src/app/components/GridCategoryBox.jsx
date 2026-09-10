@@ -154,14 +154,6 @@ const SectionGridCategoryBox = ({
           {t.Viewall || "Zobraziť všetky"}
         </Link>
       </div>
-      <div className="mt-3 text-center sm:text-right">
-        <a
-          href="/destination-photo-credits.html"
-          className="text-xs text-neutral-500 underline-offset-2 hover:text-[#1A3A2E] hover:underline"
-        >
-          {language === "en" ? "Photo credits and licences" : "Autori fotografií a licencie"}
-        </a>
-      </div>
     </div>
   );
 };
