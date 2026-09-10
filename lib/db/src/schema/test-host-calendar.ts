@@ -12,17 +12,20 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { testHostAccommodationsTable } from "./test-host-accommodations";
+import { testHostReservationsTable } from "./test-host-reservations";
 
 /**
  * Per-property availability. Blocked ranges are stored as inclusive calendar
  * dates (no time component) so the same block reads identically regardless of
  * the host's or the server's timezone. Manual blocks are owned by the host;
  * `feed` blocks are what the last successful fetch of an iCal feed imported
- * and are replaced wholesale on every fetch.
+ * and are replaced wholesale on every fetch; `reservation` blocks are the
+ * nights of an accepted stay and live exactly as long as that acceptance
+ * (written and removed in the same transaction as the reservation change).
  */
 export const testHostCalendarBlockSource = pgEnum(
   "putko_test_host_calendar_block_source",
-  ["manual", "feed"],
+  ["manual", "feed", "reservation"],
 );
 
 export const testHostCalendarBlocksTable = pgTable(
@@ -38,6 +41,13 @@ export const testHostCalendarBlocksTable = pgTable(
     // Identifier of the feed entry inside the accommodation payload's
     // `calendarFeeds` array; null for manual blocks.
     feedId: text("feed_id"),
+    // The accepted reservation this block belongs to; null unless
+    // `source = reservation`. Cascades so a deleted reservation can never
+    // leave its nights blocked.
+    reservationId: uuid("reservation_id").references(
+      () => testHostReservationsTable.id,
+      { onDelete: "cascade" },
+    ),
     note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

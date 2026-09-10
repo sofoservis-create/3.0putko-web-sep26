@@ -76,7 +76,17 @@ describe("selection", () => {
     const blocks = [manual("2026-09-20", "2026-09-22"), feed("2026-09-22", "2026-09-23")];
     expect(dayCoverage(blocks, "2026-09-22")).toMatchObject({ manual: blocks[0], feeds: [blocks[1]] });
     expect(dayCoverage(blocks, "2026-09-23")).toMatchObject({ manual: null });
-    expect(dayCoverage(blocks, "2026-09-19")).toEqual({ manual: null, feeds: [] });
+    expect(dayCoverage(blocks, "2026-09-19")).toEqual({ manual: null, feeds: [], reservation: null });
+  });
+
+  it("keeps reserved nights apart from manual and feed blocks", () => {
+    const reserved = { id: "r", startDate: "2026-09-22", endDate: "2026-09-24", source: "reservation", reservationId: "res-1", note: "Jana" };
+    const manual = { id: "m", startDate: "2026-09-24", endDate: "2026-09-25", source: "manual" };
+    expect(dayCoverage([reserved, manual], "2026-09-23")).toMatchObject({ manual: null, reservation: reserved });
+    expect(dayCoverage([reserved, manual], "2026-09-24")).toMatchObject({ manual, reservation: reserved });
+    // Reserved nights cannot be blocked again nor released from here.
+    expect(selectionSummary([reserved, manual], { startDate: "2026-09-22", endDate: "2026-09-23" })).toMatchObject({ canBlock: false, canUnblock: false, reservedDays: 2 });
+    expect(selectionSummary([reserved, manual], { startDate: "2026-09-23", endDate: "2026-09-26" })).toMatchObject({ canBlock: true, canUnblock: true, reservedDays: 2 });
   });
 });
 

@@ -15,8 +15,9 @@ const t = (language, en, sk) => (language === "en" ? en : sk);
 /**
  * Touch-first month view. Each day is a ≥44px button; tapping twice selects a
  * range (the parent owns the selection). Past days are visible but inert.
- * Manual blocks and feed-imported dates use different fills so the host can
- * tell what they can change here from what comes from another calendar.
+ * Manual blocks, reserved nights and feed-imported dates use different fills
+ * so the host can tell what they can change here from what is booked or
+ * comes from another calendar.
  */
 export default function MonthGrid({
   month,
@@ -76,19 +77,23 @@ export default function MonthGrid({
               const isToday = cell.iso === today;
               const coverage = dayCoverage(blocks, cell.iso);
               const manual = Boolean(coverage.manual);
+              const reserved = Boolean(coverage.reservation);
               const fromFeed = coverage.feeds.length > 0;
               const selected = isInRange(cell.iso, selection);
               const isAnchor = anchor === cell.iso && !selection;
               const interactive = !past && !disabled;
 
-              const state = manual
-                ? t(language, "blocked", "blokované")
-                : fromFeed
-                  ? t(language, "blocked by a connected calendar", "blokované pripojeným kalendárom")
-                  : t(language, "available", "voľné");
+              const state = reserved
+                ? `${t(language, "reserved", "rezervované")}${coverage.reservation.note ? ` · ${coverage.reservation.note}` : ""}`
+                : manual
+                  ? t(language, "blocked", "blokované")
+                  : fromFeed
+                    ? t(language, "blocked by a connected calendar", "blokované pripojeným kalendárom")
+                    : t(language, "available", "voľné");
 
               let fill = "bg-white text-[#1E3E2B]";
-              if (manual) fill = "bg-[#1E3E2B] text-white";
+              if (reserved) fill = "bg-[#DFBA73] text-[#1E3E2B]";
+              else if (manual) fill = "bg-[#1E3E2B] text-white";
               else if (fromFeed) fill = "bg-[repeating-linear-gradient(135deg,#E5E7EB_0,#E5E7EB_4px,#F5F5F5_4px,#F5F5F5_8px)] text-neutral-600";
               if (!cell.inMonth) fill += " opacity-40";
               if (past) fill += " opacity-35";
@@ -118,6 +123,7 @@ export default function MonthGrid({
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[12px] font-semibold text-neutral-600">
         <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-neutral-300 bg-white" /> {t(language, "Available", "Voľné")}</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-[#1E3E2B]" /> {t(language, "Blocked by you", "Blokované vami")}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-[#DFBA73]" /> {t(language, "Reserved", "Rezervované")}</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-[repeating-linear-gradient(135deg,#E5E7EB_0,#E5E7EB_3px,#F5F5F5_3px,#F5F5F5_6px)] border border-neutral-300" /> {t(language, "From a connected calendar", "Z pripojeného kalendára")}</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border-2 border-[#DFBA73]" /> {t(language, "Selected", "Vybrané")}</span>
       </div>

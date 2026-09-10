@@ -300,12 +300,21 @@ export default function HostCalendarPage({ listingId, language }) {
                         {daysLabel(rangeDays(block), language)}
                         {block.source === "feed"
                           ? ` · ${t(language, "from", "z")} ${feed?.label?.trim() || t(language, "connected calendar", "pripojeného kalendára")}`
-                          : block.note
-                            ? ` · ${block.note}`
-                            : ` · ${t(language, "blocked by you", "blokované vami")}`}
+                          : block.source === "reservation"
+                            ? ` · ${t(language, "reserved", "rezervované")}${block.note ? ` · ${block.note}` : ""}`
+                            : block.note
+                              ? ` · ${block.note}`
+                              : ` · ${t(language, "blocked by you", "blokované vami")}`}
                       </p>
                     </div>
-                    {block.source === "manual" ? (
+                    {block.source === "reservation" ? (
+                      <Link
+                        {...linkProps(hostPaths.reservation(block.reservationId))}
+                        className="inline-flex min-h-11 items-center rounded-xl border border-[#DFBA73] bg-[#DFBA73]/10 px-4 text-[13px] font-bold text-[#1E3E2B] transition-colors hover:bg-[#DFBA73]/20"
+                      >
+                        {t(language, "Open reservation", "Otvoriť rezerváciu")}
+                      </Link>
+                    ) : block.source === "manual" ? (
                       <button
                         type="button"
                         disabled={rangeBusy}
@@ -360,7 +369,7 @@ export default function HostCalendarPage({ listingId, language }) {
                 <p className="truncate text-[15px] font-bold text-[#1E3E2B]">{formatRange(activeRange, language)}</p>
                 <p className="text-[12px] text-neutral-600">
                   {selection
-                    ? `${daysLabel(summary.days, language)}${summary.feedDays > 0 ? ` · ${t(language, "some days come from a connected calendar", "niektoré dni sú z pripojeného kalendára")}` : ""}`
+                    ? `${daysLabel(summary.days, language)}${summary.reservedDays > 0 ? ` · ${t(language, "some nights are reserved", "niektoré noci sú rezervované")}` : ""}${summary.feedDays > 0 ? ` · ${t(language, "some days come from a connected calendar", "niektoré dni sú z pripojeného kalendára")}` : ""}`
                     : t(language, "Now tap the last day (or the same day again).", "Teraz ťuknite na posledný deň (alebo znova na ten istý).")}
                 </p>
               </div>

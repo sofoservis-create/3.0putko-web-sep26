@@ -82,18 +82,21 @@ const overlapsDay = (block, iso) =>
   compareDates(block.startDate, iso) <= 0 && compareDates(block.endDate, iso) >= 0;
 
 /**
- * What covers one day: the manual block (if any) and the feed blocks (if any).
- * Feed-imported dates cannot be changed here, so the UI needs both separately.
+ * What covers one day: the manual block (if any), the feed blocks (if any)
+ * and the accepted reservation (if any). Feed-imported dates and reserved
+ * nights cannot be changed here, so the UI needs them separately.
  */
 export const dayCoverage = (blocks, iso) => {
   let manual = null;
+  let reservation = null;
   const feeds = [];
   for (const block of blocks) {
     if (!overlapsDay(block, iso)) continue;
     if (block.source === "manual") manual = manual ?? block;
+    else if (block.source === "reservation") reservation = reservation ?? block;
     else feeds.push(block);
   }
-  return { manual, feeds };
+  return { manual, feeds, reservation };
 };
 
 /** Range from the tap sequence: first tap anchors, second tap closes. */
@@ -108,25 +111,33 @@ export const isInRange = (iso, range) =>
 
 /**
  * Which actions a selected range allows. "Block" needs at least one day that
- * is not manually blocked yet; "Unblock" needs at least one manually blocked
- * day. Feed-imported days count as neither: they come from the other calendar.
+ * is neither manually blocked nor reserved yet; "Unblock" needs at least one
+ * manually blocked day. Feed-imported days count as neither: they come from
+ * the other calendar. Reserved nights belong to the Reservations section.
  */
 export const selectionSummary = (blocks, range) => {
-  if (!range) return { days: 0, canBlock: false, canUnblock: false, feedDays: 0 };
+  if (!range) return { days: 0, canBlock: false, canUnblock: false, feedDays: 0, reservedDays: 0 };
   let manualDays = 0;
   let feedDays = 0;
+  let reservedDays = 0;
+  let coveredDays = 0;
   const total = rangeDays(range);
   for (let offset = 0; offset < total; offset += 1) {
     const iso = addDays(range.startDate, offset);
     const coverage = dayCoverage(blocks, iso);
     if (coverage.manual) manualDays += 1;
     if (coverage.feeds.length > 0) feedDays += 1;
+    if (coverage.reservation) reservedDays += 1;
+    if (coverage.manual || coverage.reservation) coveredDays += 1;
   }
   return {
     days: total,
-    canBlock: manualDays < total,
+    // Reserved nights are already taken by a guest; blocking them again adds
+    // nothing, and only manual blocks can be released from the calendar.
+    canBlock: coveredDays < total,
     canUnblock: manualDays > 0,
     feedDays,
+    reservedDays,
   };
 };
 

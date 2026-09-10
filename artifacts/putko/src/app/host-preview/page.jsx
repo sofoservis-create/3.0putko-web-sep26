@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { AuthContext } from "../context/AuthContext";
 import { FormContext } from "../FormContext";
 import {
-  ArrowLeft, LayoutDashboard, House, BookOpenText, CalendarDays,
+  ArrowLeft, LayoutDashboard, House, BookOpenText, CalendarDays, ClipboardList,
   Menu as MenuIcon, Undo, ChevronRight, Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -17,6 +17,9 @@ import AccommodationsList from "./components/AccommodationsList";
 import AccommodationForm from "./components/AccommodationForm";
 import HostCalendarPage from "../host/calendar/HostCalendarPage";
 import CalendarHome from "../host/calendar/CalendarHome";
+import ReservationsPage from "../host/reservations/ReservationsPage";
+import ReservationDetailPage from "../host/reservations/ReservationDetailPage";
+import { HostReservationsProvider, useHostReservations } from "../host/reservations/HostReservationsContext";
 import {
   hostPaths,
   resolveHostLocation,
@@ -36,7 +39,9 @@ export default function HostWorkspace() {
   return (
     <ProtectedRoute allowedRoles={["host"]}>
       <HostListingsProvider>
-        <HostWorkspaceShell />
+        <HostReservationsProvider>
+          <HostWorkspaceShell />
+        </HostReservationsProvider>
       </HostListingsProvider>
     </ProtectedRoute>
   );
@@ -70,6 +75,10 @@ function HostWorkspaceShell() {
   const location = useMemo(() => resolveHostLocation(pathname, search), [pathname, search]);
 
   const { listings: hostAccommodations, loaded: listingsLoaded, refresh: refreshListings } = useHostListings();
+  const { reservations, refresh: refreshReservations } = useHostReservations();
+  // Open requests are the one thing a host must act on; the count sits on the
+  // Reservations entry in both navigations.
+  const openRequests = reservations.filter((item) => item.stage === "request").length;
   const [switching, setSwitching] = useState(false);
 
   // Older traveler screens set a flag before redirecting to /host. Honour it
@@ -101,6 +110,12 @@ function HostWorkspaceShell() {
     if (editorOpen) return;
     refreshListings({ background: true });
   }, [section, editorOpen, refreshListings]);
+
+  // Reservations change on the server without this host (new requests, stays
+  // becoming active), so entering the section always re-syncs quietly.
+  useEffect(() => {
+    if (section === "reservations") refreshReservations({ background: true });
+  }, [section, refreshReservations]);
 
   // Mode switching removes the editor (ProtectedRoute re-evaluates the role),
   // so the unsaved-changes confirmation must come before the mode mutation.
@@ -135,6 +150,9 @@ function HostWorkspaceShell() {
     // Calendar returned to primary navigation once per-property availability
     // (blocks + feed status) persisted and stayed isolated per listing.
     { id: "calendar", href: hostPaths.calendar, icon: CalendarDays, label: { en: "Calendar", sk: "Kalendár" } },
+    // Reservations joined once accept/decline/cancel persisted and kept the
+    // property calendar consistent (accepted stays block their nights).
+    { id: "reservations", href: hostPaths.reservations(), icon: ClipboardList, label: { en: "Reservations", sk: "Rezervácie" }, badge: openRequests },
   ];
   const MOBILE_TABS = [
     ...NAV_ITEMS,
@@ -178,11 +196,11 @@ function HostWorkspaceShell() {
     user?.name?.trim()?.charAt(0)?.toUpperCase() ||
     user?.email?.trim()?.charAt(0)?.toUpperCase() ||
     "H";
+  const isActive = (id) => section === id || (id === "reservations" && section === "reservation");
   const activeMobileLabel =
-    MOBILE_TABS.find((tab) => tab.id === section)?.label[language] ||
+    MOBILE_TABS.find((tab) => isActive(tab.id))?.label[language] ||
     (language === "en" ? "Host workspace" : "Pracovisko hostiteľa");
 
-  const isActive = (id) => section === id;
   const navButtonClass = (active) =>
     `w-full flex min-h-11 items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all ${
       active
@@ -307,6 +325,16 @@ function HostWorkspaceShell() {
         ) : (
           <CalendarHome language={language} />
         );
+      case "reservations":
+        return <ReservationsPage filters={location?.filters ?? null} language={language} />;
+      case "reservation":
+        return (
+          <ReservationDetailPage
+            key={location.reservationId}
+            reservationId={location.reservationId}
+            language={language}
+          />
+        );
       case "menu":
         return renderMobileMenu();
       case "today":
@@ -351,7 +379,15 @@ function HostWorkspaceShell() {
                   <li key={tab.id}>
                     <Link {...linkProps(tab.href)} aria-current={active ? "page" : undefined} className={navButtonClass(active)}>
                       <tab.icon size={20} className={active ? "text-[#1E3E2B]" : "text-[#DFBA73]"} strokeWidth={active ? 2.5 : 2} />
-                      <span className="text-[15px]">{tab.label[language]}</span>
+                      <span className="flex-1 text-[15px]">{tab.label[language]}</span>
+                      {tab.badge > 0 && (
+                        <span
+                          aria-label={language === "en" ? `${tab.badge} open requests` : `Otvorené žiadosti: ${tab.badge}`}
+                          className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-bold ${active ? "bg-[#1E3E2B] text-[#DFBA73]" : "bg-[#DFBA73] text-[#1E3E2B]"}`}
+                        >
+                          {tab.badge}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
@@ -447,7 +483,17 @@ function HostWorkspaceShell() {
                     aria-current={active ? "page" : undefined}
                     className={`flex min-h-11 flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${active ? "text-[#1E3E2B]" : "text-neutral-400 hover:text-neutral-800"}`}
                   >
-                    <tab.icon size={26} className={active ? "text-[#DFBA73] fill-[#DFBA73]/20" : ""} strokeWidth={active ? 2.5 : 2} />
+                    <span className="relative">
+                      <tab.icon size={26} className={active ? "text-[#DFBA73] fill-[#DFBA73]/20" : ""} strokeWidth={active ? 2.5 : 2} />
+                      {tab.badge > 0 && (
+                        <span
+                          aria-label={language === "en" ? `${tab.badge} open requests` : `Otvorené žiadosti: ${tab.badge}`}
+                          className="absolute -right-2.5 -top-1.5 min-w-[18px] rounded-full bg-amber-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white"
+                        >
+                          {tab.badge > 9 ? "9+" : tab.badge}
+                        </span>
+                      )}
+                    </span>
                     <span className={`text-[10px] uppercase tracking-wide ${active ? "font-bold" : "font-semibold"}`}>{tab.label[language]}</span>
                   </Link>
                 );

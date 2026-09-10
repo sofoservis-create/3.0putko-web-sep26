@@ -20,6 +20,9 @@ const testGuestRequest = async (path, options = {}) => {
     error.status = response.status;
     // Machine-readable reason (calendar routes) so the UI can localize it.
     if (typeof data.code === "string") error.code = data.code;
+    // Full error body: 409s from the reservations routes carry the calendar
+    // conflicts or the reservation's current state so the UI can show them.
+    error.data = data;
     throw error;
   }
   return data;
@@ -97,3 +100,21 @@ export const setHostCalendarMode = (id, calendarChoice) =>
   testGuestRequest(`${calendarPath(id)}/mode`, { method: "POST", body: JSON.stringify({ calendarChoice }) });
 export const fetchHostCalendarFeed = (id, feedId) =>
   testGuestRequest(calendarPath(id, `/feeds/${encodeURIComponent(feedId)}/fetch`), { method: "POST" });
+
+// Reservations (development Host workspace). Every call is scoped to the
+// authenticated host on the server; ids are never trusted for ownership.
+export const listHostReservations = () => testGuestRequest("/host-reservations");
+export const getHostReservation = (id) =>
+  testGuestRequest(`/host-reservations/${encodeURIComponent(id)}`);
+// `action` is accept | decline | cancel; the server rejects anything else and
+// any transition its allowed-transition map does not list.
+export const transitionHostReservation = (id, action, { note } = {}) =>
+  testGuestRequest(`/host-reservations/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    body: JSON.stringify(note ? { note } : {}),
+  });
+export const createHostReservationFixtures = (accommodationId) =>
+  testGuestRequest("/host-reservations/fixtures", {
+    method: "POST",
+    body: JSON.stringify({ accommodationId }),
+  });

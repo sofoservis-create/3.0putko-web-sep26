@@ -52,6 +52,11 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  *   when the payload changed.
  * - Feeds are only fetched on demand (add / retry). Status reports exactly the
  *   outcome of that last attempt; nothing claims live synchronisation.
+ * - `reservation` blocks are owned by the reservations API: they are created
+ *   when a host accepts a stay and removed when it is declined/cancelled, in
+ *   the same transaction. This API only reports them; block/unblock touch
+ *   manual blocks exclusively, so a host can never unblock a booked night
+ *   from here.
  * - Concurrency: every read-modify-write (blocks, feed list, fetch results,
  *   reconciliation) runs in a transaction that first locks the accommodation
  *   row `FOR UPDATE` and re-reads the payload, so two requests for the same
@@ -78,8 +83,9 @@ type Snapshot = {
     id: string;
     startDate: string;
     endDate: string;
-    source: "manual" | "feed";
+    source: "manual" | "feed" | "reservation";
     feedId: string | null;
+    reservationId: string | null;
     note: string | null;
   }>;
   feeds: Array<
@@ -251,6 +257,7 @@ const snapshotFor = (accommodationId: string, ownerId: string): Promise<Snapshot
         endDate: block.endDate,
         source: block.source,
         feedId: block.feedId,
+        reservationId: block.reservationId,
         note: block.note,
       })),
       feeds: feeds.map((feed) => {
