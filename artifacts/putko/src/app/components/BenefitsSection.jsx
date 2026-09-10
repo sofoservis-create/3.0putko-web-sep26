@@ -47,9 +47,9 @@ const BenefitsSection = ({ className = "" }) => {
   ];
 
   return (
-    <div className={`py-12 lg:py-24 bg-white ${className}`}>
+    <section className={`py-12 md:py-16 lg:py-20 bg-white ${className}`}>
       <div className="container mx-auto px-4 max-w-7xl">
-        <div className="text-center max-w-2xl mx-auto mb-16">
+        <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] mb-4">
             {t.Benefits_Title || "Prečo si vybrať Putko?"}
           </h2>
@@ -58,7 +58,7 @@ const BenefitsSection = ({ className = "" }) => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
           {benefits.map((item) => (
             <div key={item.id} className="flex flex-col items-center text-center group">
               <div className="w-16 h-16 rounded-2xl bg-[#F4FBF8] text-[#238869] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#238869] group-hover:text-white transition-all duration-300">
@@ -74,7 +74,7 @@ const BenefitsSection = ({ className = "" }) => {
           ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

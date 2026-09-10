@@ -27,7 +27,7 @@ const CardCategorySlider = ({
       type="button"
       aria-label={`${name}, ${count} ${t.properties || "ubytovaní"}`}
       onClick={onClick}
-      className={`nc-CardCategorySlider relative flex w-full aspect-[16/10] flex-col overflow-hidden rounded-2xl group cursor-pointer ${className}`}
+      className={`nc-CardCategorySlider relative flex w-full aspect-[16/10] flex-col overflow-hidden rounded-[20px] group cursor-pointer ${className}`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#1A3A2E] via-[#238869] to-[#8BC9B5] transition-transform duration-700 group-hover:scale-105">
         {thumbnail && (
@@ -60,14 +60,14 @@ const CardCategorySlider = ({
       </div>
       
       {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
       {/* Content */}
-      <div className="absolute bottom-0 left-0 p-5 md:p-6 w-full flex flex-col items-start justify-end h-full">
-        <h2 className="text-xl md:text-2xl font-bold font-fraunces text-white mb-1 md:mb-1.5 drop-shadow-md">
+      <div className="absolute bottom-0 left-0 p-5 lg:p-6 w-full flex flex-col items-start justify-end h-full">
+        <h2 className="text-xl lg:text-2xl font-bold font-fraunces text-white mb-1 lg:mb-1.5 drop-shadow-md">
           {name}
         </h2>
-        <span className="text-xs md:text-sm font-inter text-white/90 font-medium drop-shadow-sm tracking-wide uppercase">
+        <span className="text-xs lg:text-sm font-inter text-white/90 font-medium drop-shadow-sm tracking-wide uppercase">
           {count > 0
             ? `${count} ${t.properties || "ubytovaní"}`
             : `${t.properties || "ubytovania"}`

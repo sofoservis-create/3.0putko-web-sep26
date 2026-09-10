@@ -17,9 +17,9 @@ export default function SavingsComparisonStrip() {
   const putkoFee = 0;
 
   return (
-    <section className="w-full py-12 lg:py-20 bg-white">
+    <section className="w-full py-12 md:py-16 lg:py-20 bg-white">
       <div className="container mx-auto px-4 max-w-5xl">
-        <div className="text-center mb-10">
+        <div className="text-center mb-8 md:mb-10">
           <h2 className="text-3xl md:text-4xl font-bold font-fraunces text-[#1A3A2E] mb-3">
             {t.Savings_Title || "Rovnaké ubytovanie. Lepšia cena."}
           </h2>

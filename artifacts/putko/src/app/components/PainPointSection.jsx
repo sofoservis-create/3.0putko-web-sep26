@@ -46,7 +46,7 @@ const PainPointSection = () => {
   const t = language === "en" ? en : sk;
 
   return (
-    <section className="w-full bg-[#FFFEF9] border-y border-neutral-100 py-12">
+    <section className="w-full bg-[#FFFEF9] border-y border-neutral-100 py-10 md:py-12">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4">
           <div className="flex items-center gap-3">

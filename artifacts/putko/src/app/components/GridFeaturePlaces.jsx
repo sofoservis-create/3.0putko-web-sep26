@@ -112,9 +112,9 @@ const GridFeaturePlaces = ({
   const sectionHeading = t.RecommendedStay || "Odporúčané ubytovania";
 
   return (
-    <div className="relative py-12 lg:py-24 container mx-auto px-4 max-w-7xl">
+    <section className="relative py-12 md:py-16 lg:py-20 container mx-auto px-4 max-w-7xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 lg:mb-12 gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-6">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] leading-tight">
           {sectionHeading}
         </h2>
@@ -145,7 +145,7 @@ const GridFeaturePlaces = ({
 
       {/* Show More / View All Button */}
       {stayListings.length > 0 && !loading && (
-        <div className="mt-10 md:mt-14 flex justify-center">
+        <div className="mt-10 md:mt-12 flex justify-center">
           <Link href="/listing-stay-map" className="w-full sm:w-auto">
             <button className="w-full sm:w-auto bg-[#238869] hover:bg-[#1A3A2E] text-white text-base font-inter font-semibold px-8 py-4 rounded-xl transition-colors">
               {t.ShowAllListing || "Zobraziť všetky ubytovania"}
@@ -153,7 +153,7 @@ const GridFeaturePlaces = ({
           </Link>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 

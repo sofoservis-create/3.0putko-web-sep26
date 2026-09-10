@@ -65,10 +65,10 @@ const SectionGridCategoryBox = ({
   };
 
   return (
-    <div className={`nc-SectionGridCategoryBox relative py-12 lg:py-20 container mx-auto px-4 max-w-7xl ${className}`}>
+    <section className={`nc-SectionGridCategoryBox relative py-12 md:py-16 lg:py-20 container mx-auto px-4 max-w-7xl ${className}`}>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 lg:mb-10 gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-5 md:gap-6">
         <div className="max-w-2xl">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] leading-tight">
             {headingText}
@@ -97,21 +97,21 @@ const SectionGridCategoryBox = ({
       </div>
 
       {/* Slider */}
-      <div className="relative group min-h-[210px] sm:min-h-[250px]" aria-live="polite">
+      <div className="relative group" aria-live="polite">
         {loading && (
           <div className="flex gap-4 overflow-hidden">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="aspect-[16/10] min-w-[78%] animate-pulse rounded-2xl bg-neutral-200 sm:min-w-[44%] lg:min-w-[23%]" />
+              <div key={item} className="aspect-[16/10] min-w-[86%] animate-pulse rounded-[20px] bg-neutral-200 sm:min-w-[47%] md:min-w-[39%] lg:min-w-[23%]" />
             ))}
           </div>
         )}
         {!loading && error && (
-          <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-[#F3F7F5] px-6 text-center text-[#4A5D54]">
+          <div className="flex min-h-36 items-center justify-center rounded-[20px] bg-[#F3F7F5] px-6 py-10 text-center text-[#4A5D54]">
             {t.PopularDestinations_Error || "Destinácie sa momentálne nepodarilo načítať."}
           </div>
         )}
         {!loading && !error && destinations.length === 0 && (
-          <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-[#F3F7F5] px-6 text-center text-[#4A5D54]">
+          <div className="flex min-h-36 items-center justify-center rounded-[20px] bg-[#F3F7F5] px-6 py-10 text-center text-[#4A5D54]">
             {t.PopularDestinations_Empty || "Momentálne nie sú dostupné žiadne destinácie."}
           </div>
         )}
@@ -123,14 +123,14 @@ const SectionGridCategoryBox = ({
             nextEl: ".next-btn",
           }}
           spaceBetween={16}
-          slidesPerView={1.22}
+          slidesPerView={1.12}
           loop={false}
           breakpoints={{
-            480: { slidesPerView: 2.2, spaceBetween: 16 },
-            768: { slidesPerView: 3.2, spaceBetween: 20 },
+            480: { slidesPerView: 2.08, spaceBetween: 16 },
+            768: { slidesPerView: 2.45, spaceBetween: 20 },
             1024: { slidesPerView: 4, spaceBetween: 24 },
           }}
-          className="!pb-6"
+          className="!overflow-visible !pb-2"
         >
           {destinations.map((item) => (
             <SwiperSlide key={item.id}>
@@ -149,12 +149,12 @@ const SectionGridCategoryBox = ({
       </div>
 
       {/* Mobile View All */}
-      <div className="mt-4 flex justify-center sm:hidden">
+      <div className="mt-6 flex justify-center sm:hidden">
         <Link href="/listing-stay-map" onClick={clearDestination} className="flex items-center justify-center w-full py-3 px-6 rounded-xl border border-neutral-200 text-[#1A3A2E] font-inter font-semibold hover:bg-neutral-50 active:bg-neutral-100 transition-colors">
           {t.Viewall || "Zobraziť všetky"}
         </Link>
       </div>
-    </div>
+    </section>
   );
 };
 

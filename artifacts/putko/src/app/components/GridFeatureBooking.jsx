@@ -36,9 +36,9 @@ const GridFeatureBooking = ({
   const renderCard = (stay) => <StayCardFeatured key={stay._id} data={stay} />;
 
   return (
-    <div className="relative py-12 lg:py-24 container mx-auto px-4 max-w-7xl">
+    <section className="relative py-12 md:py-16 lg:py-20 container mx-auto px-4 max-w-7xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 lg:mb-12 gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-6">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] leading-tight">
           {t.Otherbookings || "Najnovšie ponuky"}
         </h2>
@@ -80,7 +80,7 @@ const GridFeatureBooking = ({
           </Link>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 

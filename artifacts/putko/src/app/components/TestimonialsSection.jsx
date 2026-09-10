@@ -87,11 +87,11 @@ export default function TestimonialsSection() {
   const t = language === "en" ? en : sk;
 
   return (
-    <section className="bg-neutral-50 py-12 lg:py-24">
+    <section className="bg-neutral-50 py-12 md:py-16 lg:py-20">
       <div className="container mx-auto px-4 max-w-7xl">
 
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 lg:mb-16">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 md:mb-12">
           <div className="max-w-2xl">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] mb-4 leading-tight">
               {t.Reviews_Heading || "Čo hovoria naši hostia?"}
@@ -127,7 +127,7 @@ export default function TestimonialsSection() {
         </div>
 
         {/* Mobile Scroll */}
-        <div className="md:hidden flex overflow-x-auto gap-4 pb-8 snap-x snap-mandatory hide-scrollbar -mx-4 px-4">
+        <div className="md:hidden flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory hide-scrollbar -mx-4 px-4">
           {REVIEWS.map(r => (
             <div key={r.id} className="min-w-[85vw] snap-center">
               <ReviewCard r={r} />

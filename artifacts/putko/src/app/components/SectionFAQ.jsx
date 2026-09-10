@@ -27,9 +27,9 @@ const SectionFAQ = ({ className = "" }) => {
   ];
 
   return (
-    <div className={`relative py-12 lg:py-24 bg-[#FFFEF9] ${className}`}>
+    <div className={`relative py-12 md:py-16 lg:py-20 bg-[#FFFEF9] ${className}`}>
       <div className="container mx-auto px-4 max-w-3xl">
-        <div className="text-center mb-12 lg:mb-16">
+        <div className="text-center mb-10 md:mb-12">
            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] mb-4">
               {t.FAQ_Title || "Často kladené otázky"}
            </h2>

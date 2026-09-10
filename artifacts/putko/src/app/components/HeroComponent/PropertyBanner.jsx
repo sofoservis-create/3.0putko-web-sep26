@@ -45,7 +45,7 @@ const PropertyBanner = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 max-w-7xl py-12 lg:py-16">
+    <div className="container mx-auto px-4 max-w-7xl py-12 md:py-16 lg:py-20">
       <div className="relative w-full rounded-3xl overflow-hidden bg-[#1A3A2E] flex flex-col md:flex-row items-center justify-between">
 
         {/* Background Pattern / Texture */}

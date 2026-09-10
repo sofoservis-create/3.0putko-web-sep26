@@ -54,9 +54,9 @@ const SectionHowItWork = () => {
   ];
 
   return (
-    <div className="py-12 lg:py-24 bg-[#FFFEF9] border-t border-neutral-100">
+    <section className="py-12 md:py-16 lg:py-20 bg-[#FFFEF9] border-t border-neutral-100">
       <div className="container mx-auto px-4 max-w-7xl">
-        <div className="text-center max-w-2xl mx-auto mb-16 lg:mb-20">
+        <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-fraunces text-[#1A3A2E] mb-4">
             {t.HowItWorks_Title || "Ako to funguje?"}
           </h2>
@@ -92,7 +92,7 @@ const SectionHowItWork = () => {
           ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
