@@ -6,7 +6,7 @@ import { AuthContext } from "../context/AuthContext";
 import { FormContext } from "../FormContext";
 import {
   ArrowLeft, LayoutDashboard, House, BookOpenText, CalendarDays, ClipboardList,
-  Menu as MenuIcon, Undo, ChevronRight, Plus,
+  Menu as MenuIcon, Undo, ChevronRight, Plus, UserRound, Landmark, KeyRound,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Link from "@/app/components/NextLink";
@@ -19,6 +19,8 @@ import HostCalendarPage from "../host/calendar/HostCalendarPage";
 import CalendarHome from "../host/calendar/CalendarHome";
 import ReservationsPage from "../host/reservations/ReservationsPage";
 import ReservationDetailPage from "../host/reservations/ReservationDetailPage";
+import HostProfilePage from "../host/profile/HostProfilePage";
+import HostPayoutsPage from "../host/payouts/HostPayoutsPage";
 import { HostReservationsProvider, useHostReservations } from "../host/reservations/HostReservationsContext";
 import {
   hostPaths,
@@ -119,14 +121,19 @@ function HostWorkspaceShell() {
 
   // Mode switching removes the editor (ProtectedRoute re-evaluates the role),
   // so the unsaved-changes confirmation must come before the mode mutation.
-  const handleSwitchToTravel = () =>
+  // Personal details and password live in the shared traveler account
+  // (`/account` is a traveler-mode screen), so "Account" from the Host menu
+  // is the same switch: both capabilities stay, only the active mode changes.
+  const handleSwitchToTravel = ({ silent = false } = {}) =>
     guardedAction(async () => {
       setSwitching(true);
       try {
         await switchMode("guest");
-        toast.success(
-          language === "en" ? "Switched to Travel Mode." : "Prepnuté do režimu cestovateľa.",
-        );
+        if (!silent) {
+          toast.success(
+            language === "en" ? "Switched to Travel Mode." : "Prepnuté do režimu cestovateľa.",
+          );
+        }
         window.location.href = "/account";
       } catch (error) {
         toast.error(error.message || "Failed to switch mode.");
@@ -134,6 +141,7 @@ function HostWorkspaceShell() {
         throw error;
       }
     });
+  const handleOpenAccount = () => handleSwitchToTravel({ silent: true });
 
   const handleBackToWeb = () =>
     guardedAction(() => {
@@ -158,6 +166,16 @@ function HostWorkspaceShell() {
     ...NAV_ITEMS,
     { id: "menu", href: hostPaths.menu, icon: MenuIcon, label: { en: "Menu", sk: "Menu" } },
   ];
+  // Host-level settings (not tied to a property). Enabled once their data
+  // persisted server-side with ownership enforced.
+  const HOST_SETTINGS_ITEMS = [
+    { id: "profile", href: hostPaths.profile, icon: UserRound, label: { en: "Host profile", sk: "Hostiteľský profil" } },
+    { id: "payouts", href: hostPaths.payouts, icon: Landmark, label: { en: "Payouts", sk: "Výplaty" } },
+  ];
+  const SECTION_LABELS = {
+    profile: { en: "Host profile", sk: "Hostiteľský profil" },
+    payouts: { en: "Payouts", sk: "Výplaty" },
+  };
 
   // Same priority rule as the Today card: READY → oldest DRAFT → LIVE.
   const setupTarget = selectPriorityListing(hostAccommodations);
@@ -199,6 +217,7 @@ function HostWorkspaceShell() {
   const isActive = (id) => section === id || (id === "reservations" && section === "reservation");
   const activeMobileLabel =
     MOBILE_TABS.find((tab) => isActive(tab.id))?.label[language] ||
+    SECTION_LABELS[section]?.[language] ||
     (language === "en" ? "Host workspace" : "Pracovisko hostiteľa");
 
   const navButtonClass = (active) =>
@@ -267,6 +286,17 @@ function HostWorkspaceShell() {
               <span className="flex-1 text-[15px] font-bold text-[#1E3E2B]">{language === "en" ? "Add listing" : "Pridať ponuku"}</span>
               <ChevronRight size={20} className="text-neutral-300" />
             </button>
+            {HOST_SETTINGS_ITEMS.map((item) => (
+              <Link
+                key={item.id}
+                {...linkProps(item.href)}
+                className="w-full flex min-h-12 items-center gap-4 px-5 py-4 text-left bg-white active:bg-neutral-50 transition-colors border-b border-neutral-100"
+              >
+                <item.icon size={22} className="text-[#1E3E2B]" />
+                <span className="flex-1 text-[15px] font-bold text-[#1E3E2B]">{item.label[language]}</span>
+                <ChevronRight size={20} className="text-neutral-300" />
+              </Link>
+            ))}
             <Link
               href={HOST_GUIDE_PATH}
               className="w-full flex min-h-12 items-center gap-4 px-5 py-4 text-left bg-white active:bg-neutral-50 transition-colors"
@@ -281,7 +311,15 @@ function HostWorkspaceShell() {
         <div>
           <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest mb-3 ml-2">{language === "en" ? "Account" : "Účet"}</h2>
           <div className="bg-white rounded-3xl border border-neutral-200 overflow-hidden shadow-sm mb-6">
-            <button type="button" onClick={handleSwitchToTravel} disabled={switching} className="w-full flex min-h-12 items-center gap-4 px-5 py-4 text-left active:bg-neutral-50 border-b border-neutral-100 transition-colors disabled:opacity-60">
+            <button type="button" onClick={handleOpenAccount} disabled={switching} className="w-full flex min-h-12 items-center gap-4 px-5 py-4 text-left active:bg-neutral-50 border-b border-neutral-100 transition-colors disabled:opacity-60">
+              <KeyRound size={22} className="text-[#1E3E2B]" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-bold text-[#1E3E2B]">{language === "en" ? "Personal details & password" : "Osobné údaje a heslo"}</span>
+                <span className="block text-[12px] font-medium text-neutral-500">{language === "en" ? "Shared account · opens in Travel mode" : "Spoločný účet · otvorí sa v režime cestovateľa"}</span>
+              </span>
+              <ChevronRight size={20} className="text-neutral-300" />
+            </button>
+            <button type="button" onClick={() => handleSwitchToTravel()} disabled={switching} className="w-full flex min-h-12 items-center gap-4 px-5 py-4 text-left active:bg-neutral-50 border-b border-neutral-100 transition-colors disabled:opacity-60">
               {switching ? <div className="w-5 h-5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" /> : <ArrowLeft size={22} className="text-neutral-500" />}
               <span className="flex-1 text-[15px] font-bold text-[#1E3E2B]">{language === "en" ? "Switch to Travel" : "Prepnúť na Cestovanie"}</span>
             </button>
@@ -335,6 +373,10 @@ function HostWorkspaceShell() {
             language={language}
           />
         );
+      case "profile":
+        return <HostProfilePage language={language} onOpenAccount={handleOpenAccount} openingAccount={switching} />;
+      case "payouts":
+        return <HostPayoutsPage language={language} />;
       case "menu":
         return renderMobileMenu();
       case "today":
@@ -425,6 +467,29 @@ function HostWorkspaceShell() {
           </div>
 
           <div>
+            <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-3">{language === "en" ? "Host settings" : "Nastavenia hostiteľa"}</div>
+            <ul className="space-y-1">
+              {HOST_SETTINGS_ITEMS.map((item) => {
+                const active = isActive(item.id);
+                return (
+                  <li key={item.id}>
+                    <Link {...linkProps(item.href)} aria-current={active ? "page" : undefined} className={navButtonClass(active)}>
+                      <item.icon size={20} className={active ? "text-[#1E3E2B]" : "text-[#DFBA73]"} strokeWidth={active ? 2.5 : 2} />
+                      <span className="flex-1 text-[15px]">{item.label[language]}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+              <li>
+                <button type="button" onClick={handleOpenAccount} disabled={switching} className={`${navButtonClass(false)} disabled:opacity-60`}>
+                  <KeyRound size={20} className="text-[#DFBA73]" />
+                  <span className="flex-1 text-[15px]">{language === "en" ? "Personal details & password" : "Osobné údaje a heslo"}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div>
             <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3 px-3">{language === "en" ? "Help" : "Pomoc"}</div>
             <ul className="space-y-1">
               <li>
@@ -438,7 +503,7 @@ function HostWorkspaceShell() {
         </div>
 
         <div className="p-4 border-t border-white/10 shrink-0 space-y-2 bg-black/10">
-          <button type="button" onClick={handleSwitchToTravel} disabled={switching} className="w-full flex min-h-11 items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white/90 text-[14px] font-bold hover:bg-white/10 transition-colors disabled:opacity-60">
+          <button type="button" onClick={() => handleSwitchToTravel()} disabled={switching} className="w-full flex min-h-11 items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white/90 text-[14px] font-bold hover:bg-white/10 transition-colors disabled:opacity-60">
             {switching ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowLeft size={18} />}
             {language === "en" ? "Switch to Travel" : "Prepnúť na Cestovanie"}
           </button>

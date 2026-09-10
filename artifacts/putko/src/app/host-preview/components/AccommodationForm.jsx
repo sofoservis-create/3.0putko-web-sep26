@@ -690,6 +690,7 @@ export default function AccommodationForm({
               addPhoto={handlePhotoAdd}
               removePhoto={handlePhotoRemove}
               calendarLinkProps={localId ? linkProps(hostPaths.listingCalendar(localId)) : null}
+              payoutsLinkProps={linkProps(hostPaths.payouts)}
             />
           </div>
 

@@ -109,6 +109,7 @@ function LeaveGuardDialog() {
       saving={nav.saving}
       saveInFlight={nav.saveInFlight}
       saveError={nav.saveError}
+      subject={nav.subject}
       onStay={nav.cancelLeave}
       onDiscard={nav.discardAndLeave}
       onSaveAndLeave={nav.saveAndLeave}

@@ -15,7 +15,8 @@ import { resolveHostLocation } from "./hostRoutes";
  * Unsaved-change protection for the Host workspace.
  *
  * A screen (the listing editor) registers a guard:
- *   { hasUnsavedChanges(): boolean, ownsLocation(location): boolean, save(): Promise<boolean>, saving?: boolean }
+ *   { hasUnsavedChanges(): boolean, ownsLocation(location): boolean, save(): Promise<boolean>, saving?: boolean, subject?: "listing" | "profile" }
+ * `subject` only picks the wording of the confirmation dialog.
  *
  * The provider sits above the app's route <Switch> so it survives leaving
  * `/host`. Three layers:
@@ -67,10 +68,13 @@ export function HostNavigationProvider({ children }) {
   // before the dialog opened) so "Discard" can be disabled until it settles.
   const [guardSaving, setGuardSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // What the registered screen edits; the dialog words its copy from this.
+  const [guardSubject, setGuardSubject] = useState("listing");
 
   const register = useCallback((guard) => {
     guardRef.current = guard;
     leavingRef.current = false;
+    setGuardSubject(guard.subject || "listing");
     return () => {
       if (guardRef.current === guard) {
         guardRef.current = null;
@@ -257,11 +261,12 @@ export function HostNavigationProvider({ children }) {
       saving,
       saveInFlight: guardSaving,
       saveError,
+      subject: guardSubject,
       cancelLeave,
       discardAndLeave,
       saveAndLeave,
     }),
-    [register, reportSaving, shownPath, guardedNavigate, guardedAction, linkProps, pending, saving, guardSaving, saveError, cancelLeave, discardAndLeave, saveAndLeave],
+    [register, reportSaving, shownPath, guardedNavigate, guardedAction, linkProps, pending, saving, guardSaving, saveError, guardSubject, cancelLeave, discardAndLeave, saveAndLeave],
   );
 
   return <HostNavigationContext.Provider value={value}>{children}</HostNavigationContext.Provider>;
@@ -293,6 +298,7 @@ export function useLeaveGuard(guard) {
   const guardRef = useRef(guard);
   guardRef.current = guard;
   const saving = Boolean(guard?.saving);
+  const subject = guard?.subject || "listing";
   useEffect(() => {
     if (reportSaving) reportSaving(saving);
   }, [reportSaving, saving]);
@@ -302,6 +308,7 @@ export function useLeaveGuard(guard) {
       hasUnsavedChanges: () => Boolean(guardRef.current?.hasUnsavedChanges?.()),
       ownsLocation: (location) => Boolean(guardRef.current?.ownsLocation?.(location)),
       save: () => guardRef.current?.save?.(),
+      subject,
     });
-  }, [register]);
+  }, [register, subject]);
 }

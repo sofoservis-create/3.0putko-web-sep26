@@ -23,3 +23,4 @@ export * from "./test-guest-favorites";
 export * from "./test-host-accommodations";
 export * from "./test-host-reservations";
 export * from "./test-host-calendar";
+export * from "./test-host-profiles";

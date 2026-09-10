@@ -31,8 +31,15 @@ export const hostPaths = {
     return `${HOST_ROOT}/reservations${query ? `?${query}` : ""}`;
   },
   reservation: (id) => `${HOST_ROOT}/reservations/${encodeURIComponent(id)}`,
+  // Host-level settings (not tied to a property).
+  profile: `${HOST_ROOT}/profile`,
+  payouts: `${HOST_ROOT}/payouts`,
   menu: `${HOST_ROOT}/menu`,
 };
+
+// Shared traveler/host identity (personal details, password) lives in the
+// traveler account; the Host menu links there instead of duplicating forms.
+export const ACCOUNT_PATH = "/account";
 
 
 // Legacy flag written by older traveler screens before host activation.
@@ -53,7 +60,7 @@ const decodeId = (raw) => {
  * Returns `{ section, listingId, review, step, reservationId, filters }` or
  * `null` when the path is not a known Host screen so the workspace can
  * redirect to the Today view. `section` is one of today | listings | listing
- * | calendar | reservations | reservation | menu; the calendar section
+ * | calendar | reservations | reservation | profile | payouts | menu; the calendar section
  * carries `listingId` when it is property-scoped, the reservations list
  * carries its `filters` and a reservation detail its `reservationId`.
  */
@@ -69,6 +76,8 @@ export function resolveHostLocation(pathname, search = "") {
   if (path === hostPaths.listings) return { ...base, section: "listings" };
   if (path === hostPaths.newListing) return { ...base, section: "listing" };
   if (path === hostPaths.calendar) return { ...base, section: "calendar" };
+  if (path === hostPaths.profile) return { ...base, section: "profile" };
+  if (path === hostPaths.payouts) return { ...base, section: "payouts" };
   if (path === hostPaths.menu) return { ...base, section: "menu" };
   if (path === `${HOST_ROOT}/reservations`) {
     const stage = params.get("stage");

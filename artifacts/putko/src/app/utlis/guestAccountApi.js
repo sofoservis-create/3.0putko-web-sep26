@@ -118,3 +118,11 @@ export const createHostReservationFixtures = (accommodationId) =>
     method: "POST",
     body: JSON.stringify({ accommodationId }),
   });
+
+// Host-level settings. The public Host Profile is keyed by the authenticated
+// user on the server (no id travels); payout readiness is read-only until a
+// payout provider exists.
+export const getHostProfile = () => testGuestRequest("/host-profile");
+export const saveHostProfile = (profile) =>
+  testGuestRequest("/host-profile", { method: "PUT", body: JSON.stringify(profile) });
+export const getHostPayoutReadiness = () => testGuestRequest("/host-payouts");

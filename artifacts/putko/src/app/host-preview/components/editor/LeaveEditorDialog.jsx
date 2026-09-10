@@ -8,7 +8,18 @@ const t = (language, en, sk) => (language === "en" ? en : sk);
  * unsaved changes. Rendered by the Host shell so it survives whatever
  * navigation was attempted. Bottom sheet on phones, dialog from `sm` up.
  */
-export default function LeaveEditorDialog({ open, language, saving, saveInFlight = false, saveError, onStay, onDiscard, onSaveAndLeave }) {
+const DESCRIPTIONS = {
+  listing: {
+    en: "Some of your edits haven't been saved to this listing yet. Save them before leaving, or discard them.",
+    sk: "Niektoré úpravy tejto ponuky ešte nie sú uložené. Pred odchodom ich uložte, alebo ich zahoďte.",
+  },
+  profile: {
+    en: "Some of your host profile edits haven't been saved yet. Save them before leaving, or discard them.",
+    sk: "Niektoré úpravy hostiteľského profilu ešte nie sú uložené. Pred odchodom ich uložte, alebo ich zahoďte.",
+  },
+};
+
+export default function LeaveEditorDialog({ open, language, saving, saveInFlight = false, saveError, subject = "listing", onStay, onDiscard, onSaveAndLeave }) {
   const dialogRef = useRef(null);
   const stayRef = useRef(null);
   const onStayRef = useRef(onStay);
@@ -74,11 +85,7 @@ export default function LeaveEditorDialog({ open, language, saving, saveInFlight
               {t(language, "Unsaved changes", "Neuložené zmeny")}
             </h2>
             <p id="leave-editor-description" className="mt-1 text-sm leading-6 text-neutral-600">
-              {t(
-                language,
-                "Some of your edits haven't been saved to this listing yet. Save them before leaving, or discard them.",
-                "Niektoré úpravy tejto ponuky ešte nie sú uložené. Pred odchodom ich uložte, alebo ich zahoďte.",
-              )}
+              {(DESCRIPTIONS[subject] || DESCRIPTIONS.listing)[language === "en" ? "en" : "sk"]}
             </p>
           </div>
         </div>

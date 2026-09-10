@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { CalendarIcon, Info, Landmark, Link2, PauseCircle, Plus, Trash2 } from "lucide-react";
 import Link from "@/app/components/NextLink";
 import { fieldElementId, isHttpUrl } from "../../../host/hostEditorValidation";
+import { payoutStatusCopy } from "../../../host/payouts/hostPayoutCopy";
 import {
   CheckCard,
   FieldError,
@@ -629,7 +630,9 @@ function Calendar({ data, errors, language, setField, calendarLinkProps }) {
   );
 }
 
-function Readiness({ data, errors, language, onChange }) {
+function Readiness({ data, errors, language, onChange, payoutsLinkProps }) {
+  // Same wording as /host/payouts (shared module) so the two never diverge.
+  const copy = payoutStatusCopy(language);
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-neutral-200 bg-neutral-50/70 p-5 sm:p-7">
@@ -641,23 +644,19 @@ function Readiness({ data, errors, language, onChange }) {
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-bold text-[#1E3E2B]">{t(language, "Payouts", "Výplaty")}</h3>
               <span className="rounded-full bg-neutral-200 px-3 py-1 text-xs font-bold text-neutral-700">
-                {t(language, "Not available yet", "Zatiaľ nedostupné")}
+                {copy.badge}
               </span>
             </div>
-            <p className="mt-2 text-[14px] font-medium leading-6 text-neutral-600">
-              {t(
-                language,
-                "Putko does not process payouts yet, and there is no Stripe account connected to this listing or to your host account. Nothing is collected from travellers and nothing is paid out.",
-                "Putko zatiaľ nespracúva výplaty a k tejto ponuke ani k vášmu hostiteľskému účtu nie je pripojený žiadny Stripe účet. Od cestovateľov sa nič nevyberá a nič sa nevypláca.",
-              )}
-            </p>
-            <p className="mt-2 text-[14px] font-medium leading-6 text-neutral-600">
-              {t(
-                language,
-                "You can finish and publish this listing now. Before paid bookings open, you will set up one payout account for your host profile; it will apply to all your listings.",
-                "Túto ponuku môžete dokončiť a zverejniť už teraz. Pred spustením platených rezervácií si nastavíte jeden výplatný účet vo svojom hostiteľskom profile; bude platiť pre všetky vaše ponuky.",
-              )}
-            </p>
+            <p className="mt-2 text-[14px] font-medium leading-6 text-neutral-600">{copy.summary}</p>
+            <p className="mt-2 text-[14px] font-medium leading-6 text-neutral-600">{copy.next}</p>
+            {payoutsLinkProps && (
+              <Link
+                {...payoutsLinkProps}
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-[#1E3E2B] px-4 text-[14px] font-bold text-[#1E3E2B] transition-colors hover:bg-[#1E3E2B]/5"
+              >
+                {t(language, "View payout status", "Zobraziť stav výplat")}
+              </Link>
+            )}
           </div>
         </div>
       </div>
