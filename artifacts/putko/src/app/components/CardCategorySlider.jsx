@@ -19,16 +19,44 @@ const CardCategorySlider = ({
 
   const t = translations[language];
   const { count, name, thumbnail } = taxonomy;
+  const responsiveImage = thumbnail?.startsWith("/destinations/") && thumbnail.endsWith("-1200.avif");
+  const imageBase = responsiveImage ? thumbnail.slice(0, -"-1200.avif".length) : null;
   
   return (
     <button
       type="button"
       aria-label={`${name}, ${count} ${t.properties || "ubytovaní"}`}
       onClick={onClick}
-      className={`nc-CardCategorySlider relative flex flex-col w-full aspect-[4/5] rounded-2xl overflow-hidden group cursor-pointer ${className}`}
+      className={`nc-CardCategorySlider relative flex w-full aspect-[16/10] flex-col overflow-hidden rounded-2xl group cursor-pointer ${className}`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#1A3A2E] via-[#238869] to-[#8BC9B5] transition-transform duration-700 group-hover:scale-105">
-        {thumbnail && <img src={thumbnail} alt="" className="h-full w-full object-cover" />}
+        {thumbnail && (
+          <picture>
+            {responsiveImage && (
+              <>
+                <source
+                  type="image/avif"
+                  srcSet={`${imageBase}-640.avif 640w, ${imageBase}-1200.avif 1200w`}
+                  sizes="(max-width: 479px) 82vw, (max-width: 767px) 46vw, (max-width: 1023px) 31vw, 25vw"
+                />
+                <source
+                  type="image/webp"
+                  srcSet={`${imageBase}-640.webp 640w, ${imageBase}-1200.webp 1200w`}
+                  sizes="(max-width: 479px) 82vw, (max-width: 767px) 46vw, (max-width: 1023px) 31vw, 25vw"
+                />
+              </>
+            )}
+            <img
+              src={thumbnail}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              width="1200"
+              height="750"
+              className="h-full w-full object-cover"
+            />
+          </picture>
+        )}
       </div>
       
       {/* Gradient Overlay */}

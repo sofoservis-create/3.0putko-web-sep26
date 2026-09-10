@@ -97,11 +97,11 @@ const SectionGridCategoryBox = ({
       </div>
 
       {/* Slider */}
-      <div className="relative group min-h-[280px] sm:min-h-[330px]" aria-live="polite">
+      <div className="relative group min-h-[210px] sm:min-h-[250px]" aria-live="polite">
         {loading && (
           <div className="flex gap-4 overflow-hidden">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-[300px] min-w-[78%] animate-pulse rounded-2xl bg-neutral-200 sm:min-w-[44%] lg:min-w-[23%]" />
+              <div key={item} className="aspect-[16/10] min-w-[78%] animate-pulse rounded-2xl bg-neutral-200 sm:min-w-[44%] lg:min-w-[23%]" />
             ))}
           </div>
         )}
@@ -153,6 +153,14 @@ const SectionGridCategoryBox = ({
         <Link href="/listing-stay-map" onClick={clearDestination} className="flex items-center justify-center w-full py-3 px-6 rounded-xl border border-neutral-200 text-[#1A3A2E] font-inter font-semibold hover:bg-neutral-50 active:bg-neutral-100 transition-colors">
           {t.Viewall || "Zobraziť všetky"}
         </Link>
+      </div>
+      <div className="mt-3 text-center sm:text-right">
+        <a
+          href="/destination-photo-credits.html"
+          className="text-xs text-neutral-500 underline-offset-2 hover:text-[#1A3A2E] hover:underline"
+        >
+          {language === "en" ? "Photo credits and licences" : "Autori fotografií a licencie"}
+        </a>
       </div>
     </div>
   );

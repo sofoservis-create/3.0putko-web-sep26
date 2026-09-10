@@ -1,0 +1,44 @@
+PUTKO — CROP GUIDE PRE 16:10 DESTINATION CARDS
+================================================
+
+Odporúčaný finálny pomer: 16:10 (napr. 2000 × 1250).
+Originály nechaj nedotknuté. Crop rob ako derivát / cez Cloudinary.
+
+11. Terchová
+   Drž celý masív Veľkého Rozsutca v zábere; nechaj vzduch nad vrcholom a po bokoch. Pri 16:10 nerež tesne okolo vrcholu.
+
+12. Orava
+   Zachovaj vodnú plochu aj horský horizont; horizont približne v hornej tretine. Bez tesného cropu.
+
+13. Oravský hrad
+   KRITICKÉ: zachovaj celý hrad aj skalný masív. Min. ~8–10 % vizuálnej rezervy hore a po bokoch; neorezávaj spodok skaly.
+
+14. Pieniny
+   Plť nech je v dolnej/strednej časti, ale zachovaj výrazný oblúk rieky a okolitú prírodu. Tváram nedávaj dominantné miesto.
+
+15. Bardejovské Kúpele
+   Zachovaj celú hlavnú fasádu a časť záhrady. Budova nemá vypĺňať celý frame.
+
+16. Piešťany
+   Priorita je centrálna časť Thermia Palace + fontána/záhrada. Neorezávaj hlavnú budovu tesne; pri 16:10 môže ísť preč časť oblohy a trávnika.
+
+17. Trenčianske Teplice
+   Zachovaj perspektívu chodníka a stromový rám. Ľudia sú malé sekundárne prvky; nerež tak, aby sa stali dominantní.
+
+18. Bojnice
+   KRITICKÉ: zachovaj celý zámok a všetky veže. Min. ~8–12 % rezervy okolo siluety; žiadna veža nesmie siahať po okraj.
+
+19. Veľká Fatra
+   Zachovaj široký hrebeň a oblohu. Horizont približne v hornej tretine až strede; nesnaž sa priblížiť iba jeden vrchol.
+
+20. Muránska planina
+   Fotka je už takmer 16:10. Zachovaj lúku, skalnaté vrchy aj dramatickú oblohu; len minimálny crop.
+
+21. Poloniny
+   Zachovaj otvorenú lúku aj lesnatý horizont; čistý pokojný travel look. Vyhni sa príliš tesnému cropu kopca.
+
+22. Slovenský kras
+   Zachovaj skalný masív aj hĺbku údolia. Nerež ľavú skalu tesne; musí byť jasné, že ide o tiesňavu.
+
+23. Zemplínska šírava
+   Voda v spodnej časti, Vihorlat ako horizontálny anchor v strede/hornej tretine. Nepribližovať príliš.
