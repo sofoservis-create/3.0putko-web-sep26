@@ -25,6 +25,7 @@ import {
   upsertConversation,
   upsertMessage,
 } from "./messagesModel";
+import { createKeyedInFlight, isFresh, sameSnapshot } from "../hostStoreUtils";
 
 /**
  * One shared messaging state for the Host workspace.
@@ -131,8 +132,17 @@ export function HostMessagesProvider({ children }) {
     setConversations((current) => upsertConversation(current, conversation));
   }, []);
 
-  const refresh = useCallback(({ background = false } = {}) => {
+  const loadedAtRef = useRef(0);
+  const threadInFlight = useRef(createKeyedInFlight());
+
+  /**
+   * Re-fetch the conversation list. `background` keeps the current list on
+   * screen; `maxAge` (ms) skips the request when the last successful load is
+   * more recent. A refresh already in flight is shared, never doubled.
+   */
+  const refresh = useCallback(({ background = false, maxAge = 0 } = {}) => {
     if (inFlightRef.current) return inFlightRef.current;
+    if (background && isFresh(loadedAtRef.current, maxAge)) return Promise.resolve(null);
     const showAsBackground = background && loadedRef.current;
     if (showAsBackground) setRefreshing(true);
     else setLoading(true);
@@ -141,8 +151,9 @@ export function HostMessagesProvider({ children }) {
       .then((result) => {
         if (!mountedRef.current) return [];
         const next = sortConversations(Array.isArray(result?.conversations) ? result.conversations : []);
-        setConversations(next);
+        setConversations((current) => sameSnapshot(current, next));
         if (typeof result?.today === "string") setToday(result.today);
+        loadedAtRef.current = Date.now();
         loadedRef.current = true;
         setLoaded(true);
         return next;
@@ -211,7 +222,8 @@ export function HostMessagesProvider({ children }) {
   const loadThread = useCallback(
     async (id) => {
       try {
-        const result = await getHostConversation(id);
+        // Initial load, poll tick and a manual retry that overlap share one GET.
+        const result = await threadInFlight.current(id, () => getHostConversation(id));
         if (!mountedRef.current) return { ok: false, ignored: true };
         if (typeof result?.today === "string") setToday(result.today);
         storeThread(result);

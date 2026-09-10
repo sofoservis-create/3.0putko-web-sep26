@@ -1,7 +1,9 @@
 "use client"
 
-import { createContext, useContext, useEffect, useReducer, useState } from "react";
+import { createContext, useContext, useEffect, useReducer, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import {
+  SESSION_EXPIRED_EVENT,
   activateGuestHostMode,
   getGuestProfile,
   isTestGuestToken,
@@ -75,6 +77,30 @@ export const AuthContextProvider = ({ children }) => {
       }
     }
     setLoading(false);
+  }, []);
+
+  // A 401 for the token we are currently signed in with means the server no
+  // longer knows this session (expired, logged out elsewhere, server reset).
+  // Ending it here lets ProtectedRoute send the user to /login with a
+  // returnTo, instead of every screen showing "session expired" + Retry.
+  const tokenRef = useRef(null);
+  tokenRef.current = state.token;
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onExpired = (event) => {
+      const expiredToken = event?.detail?.token;
+      if (!expiredToken || expiredToken !== tokenRef.current) return;
+      dispatch({ type: "LOGOUT" });
+      const language = localStorage.getItem("appLanguage") === "en" ? "en" : "sk";
+      toast.info(
+        language === "en"
+          ? "Your session has expired. Please log in again."
+          : "Platnosť relácie vypršala. Prihláste sa znova.",
+        { toastId: "session-expired" },
+      );
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
   useEffect(() => {

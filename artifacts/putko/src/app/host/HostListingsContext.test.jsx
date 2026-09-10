@@ -119,4 +119,54 @@ describe("HostListingsProvider refresh/mutation ordering", () => {
     });
     expect(screen.getByTestId("ids").textContent).toBe("z");
   });
+
+  it("a background refresh within maxAge is skipped, a forced one still hits the server", async () => {
+    await renderStore([listing("a", "2026-09-09T10:00:00Z")]);
+    expect(listHostAccommodations).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await store.refresh({ background: true, maxAge: 15_000 });
+    });
+    expect(listHostAccommodations).toHaveBeenCalledTimes(1);
+
+    listHostAccommodations.mockResolvedValueOnce({ accommodations: [listing("a", "2026-09-09T10:00:00Z")] });
+    await act(async () => {
+      await store.refresh({ background: true });
+    });
+    expect(listHostAccommodations).toHaveBeenCalledTimes(2);
+  });
+
+  it("an unchanged snapshot keeps the previous array identity so dependents do not re-run", async () => {
+    await renderStore([listing("a", "2026-09-09T10:00:00Z")]);
+    const before = store.listings;
+    listHostAccommodations.mockResolvedValueOnce({ accommodations: [listing("a", "2026-09-09T10:00:00Z")] });
+    await act(async () => {
+      await store.refresh({ background: true });
+    });
+    expect(store.listings).toBe(before);
+
+    listHostAccommodations.mockResolvedValueOnce({ accommodations: [listing("a", "2026-09-09T11:00:00Z")] });
+    await act(async () => {
+      await store.refresh({ background: true });
+    });
+    expect(store.listings).not.toBe(before);
+  });
+
+  it("two concurrent refreshes share one request", async () => {
+    await renderStore([listing("a", "2026-09-09T10:00:00Z")]);
+    const pending = deferred();
+    listHostAccommodations.mockReturnValueOnce(pending.promise);
+    let first;
+    let second;
+    act(() => {
+      first = store.refresh({ background: true });
+      second = store.refresh({ background: true });
+    });
+    expect(first).toBe(second);
+    expect(listHostAccommodations).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      pending.resolve({ accommodations: [] });
+      await first;
+    });
+  });
 });

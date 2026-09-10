@@ -59,7 +59,7 @@ export function SaveStatus({ state, dirty, savedAt, hasListing, language, onRetr
         <button
           type="button"
           onClick={onRetry}
-          className="min-h-9 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[12px] font-bold text-red-700 transition-colors hover:bg-red-100"
+          className="min-h-11 rounded-lg border border-red-200 bg-red-50 px-3 text-[12px] font-bold text-red-700 transition-colors hover:bg-red-100"
         >
           {en ? "Retry" : "Skúsiť znova"}
         </button>

@@ -280,7 +280,7 @@ export default function FeedsSection({
         <div className="mt-4 rounded-2xl bg-[#F8F4EA] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-[14px] font-bold text-[#1E3E2B]">{t(language, "New calendar link", "Nový odkaz na kalendár")}</h3>
-            <button type="button" onClick={() => setAdding(false)} disabled={addingFeed} aria-label={t(language, "Close", "Zavrieť")} className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-white">
+            <button type="button" onClick={() => setAdding(false)} disabled={addingFeed} aria-label={t(language, "Close", "Zavrieť")} className="flex h-11 w-11 items-center justify-center rounded-lg text-neutral-500 hover:bg-white">
               <X size={18} />
             </button>
           </div>

@@ -25,6 +25,7 @@ import MessagesPage from "../host/messages/MessagesPage";
 import ConversationPage from "../host/messages/ConversationPage";
 import { HostMessagesProvider, useHostMessages } from "../host/messages/HostMessagesContext";
 import { HostReservationsProvider, useHostReservations } from "../host/reservations/HostReservationsContext";
+import { DEFAULT_MAX_AGE_MS } from "../host/hostStoreUtils";
 import {
   hostPaths,
   resolveHostLocation,
@@ -118,19 +119,19 @@ function HostWorkspaceShell() {
   // without flashing a loading state.
   useEffect(() => {
     if (editorOpen) return;
-    refreshListings({ background: true });
+    refreshListings({ background: true, maxAge: DEFAULT_MAX_AGE_MS });
   }, [section, editorOpen, refreshListings]);
 
   // Reservations change on the server without this host (new requests, stays
   // becoming active), so entering the section always re-syncs quietly.
   useEffect(() => {
-    if (section === "reservations" || section === "today") refreshReservations({ background: true });
+    if (section === "reservations" || section === "today") refreshReservations({ background: true, maxAge: DEFAULT_MAX_AGE_MS });
   }, [section, refreshReservations]);
 
   // Guests write without this host doing anything, so the conversation list
   // (and its unread count) re-syncs whenever Messages or Today is opened.
   useEffect(() => {
-    if (section === "messages" || section === "today") refreshMessages({ background: true });
+    if (section === "messages" || section === "today") refreshMessages({ background: true, maxAge: DEFAULT_MAX_AGE_MS });
   }, [section, refreshMessages]);
 
   // Mode switching removes the editor (ProtectedRoute re-evaluates the role),
@@ -150,7 +151,15 @@ function HostWorkspaceShell() {
         }
         window.location.href = "/account";
       } catch (error) {
-        toast.error(error.message || "Failed to switch mode.");
+        // Session loss is announced (and redirected) by AuthContext; every
+        // other failure keeps the menu usable so the host can simply retry.
+        if (error?.status !== 401) {
+          toast.error(
+            language === "en"
+              ? "Couldn't switch mode. Check your connection and try again."
+              : "Režim sa nepodarilo prepnúť. Skontrolujte pripojenie a skúste to znova.",
+          );
+        }
         setSwitching(false);
         throw error;
       }

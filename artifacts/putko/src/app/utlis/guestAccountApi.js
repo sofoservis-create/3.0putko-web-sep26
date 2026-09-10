@@ -3,6 +3,16 @@ import { Base_URL, TestGuestAuth_URL } from "../config";
 export const isTestGuestToken = (token) =>
   Boolean(TestGuestAuth_URL && token?.startsWith("test_session_"));
 
+// Fired on `window` when a request made with a stored session token comes
+// back 401. AuthContext listens and ends the session so protected screens
+// send the user to log in instead of showing a dead "Retry" button.
+export const SESSION_EXPIRED_EVENT = "putko:session-expired";
+
+const announceSessionExpired = (token) => {
+  if (typeof window === "undefined" || !token) return;
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { token } }));
+};
+
 const testGuestRequest = async (path, options = {}) => {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -18,6 +28,7 @@ const testGuestRequest = async (path, options = {}) => {
   if (!response.ok) {
     const error = new Error(data.message || "Request failed");
     error.status = response.status;
+    if (response.status === 401) announceSessionExpired(token);
     // Machine-readable reason (calendar routes) so the UI can localize it.
     if (typeof data.code === "string") error.code = data.code;
     // Full error body: 409s from the reservations routes carry the calendar

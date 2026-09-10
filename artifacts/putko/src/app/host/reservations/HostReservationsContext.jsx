@@ -14,6 +14,7 @@ import {
   transitionHostReservation,
 } from "../../utlis/guestAccountApi";
 import { upsertReservation } from "./reservationModel";
+import { createKeyedInFlight, isFresh, sameSnapshot } from "../hostStoreUtils";
 
 // One shared reservations state for the Host workspace. The list, the detail
 // screen and the navigation badge all read from here, so an accept/decline
@@ -54,8 +55,17 @@ export function HostReservationsProvider({ children }) {
     };
   }, []);
 
-  const refresh = useCallback(({ background = false } = {}) => {
+  const loadedAtRef = useRef(0);
+  const loadOneInFlight = useRef(createKeyedInFlight());
+
+  /**
+   * Re-fetch the list. `background` keeps the current items on screen;
+   * `maxAge` (ms) skips the request when the last successful load is more
+   * recent. A refresh already in flight is shared, never doubled.
+   */
+  const refresh = useCallback(({ background = false, maxAge = 0 } = {}) => {
     if (inFlightRef.current) return inFlightRef.current;
+    if (background && isFresh(loadedAtRef.current, maxAge)) return Promise.resolve(null);
     const showAsBackground = background && loadedRef.current;
     if (showAsBackground) setRefreshing(true);
     else setLoading(true);
@@ -67,8 +77,10 @@ export function HostReservationsProvider({ children }) {
         if (!mountedRef.current) return [];
         let next = Array.isArray(result?.reservations) ? result.reservations : [];
         for (const item of pendingUpsertsRef.current) next = upsertReservation(next, item);
-        setItems(next);
+        const snapshot = next;
+        setItems((current) => sameSnapshot(current, snapshot));
         if (typeof result?.today === "string") setToday(result.today);
+        loadedAtRef.current = Date.now();
         loadedRef.current = true;
         setLoaded(true);
         return next;
@@ -106,7 +118,8 @@ export function HostReservationsProvider({ children }) {
   const loadOne = useCallback(
     async (id) => {
       try {
-        const result = await getHostReservation(id);
+        // Detail + list mounting together (deep link) share one GET per id.
+        const result = await loadOneInFlight.current(id, () => getHostReservation(id));
         if (!mountedRef.current) return { ok: false, ignored: true };
         if (typeof result?.today === "string") setToday(result.today);
         storeReservation(result?.reservation);

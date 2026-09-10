@@ -77,8 +77,8 @@ export default function Overview({ filters }) {
   const { guardedNavigate, linkProps } = useHostNavigation();
   // Any change in the modules' stores re-fetches the summary so Today never
   // shows a number the owning module already moved past.
-  const { reservations } = useHostReservations();
-  const { conversations } = useHostMessages();
+  const { reservations, loaded: reservationsLoaded } = useHostReservations();
+  const { conversations, loaded: conversationsLoaded } = useHostMessages();
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -131,16 +131,28 @@ export default function Overview({ filters }) {
     load();
   }, [load]);
 
-  // Re-aggregate after the first load whenever a module's data changed.
+  // Re-aggregate after the first load whenever a module's data changed. A
+  // store finishing its *initial* load is not a change worth a second summary
+  // request: that list was fetched alongside the summary itself. The stores
+  // also keep their array identity for no-op refreshes, so only real
+  // differences (mutations, new requests, new messages) reach this effect.
   const firstSync = useRef(true);
+  const loadedFlagsRef = useRef({ listingsLoaded, reservationsLoaded, conversationsLoaded });
   useEffect(() => {
+    const previous = loadedFlagsRef.current;
+    const initialPopulation =
+      (listingsLoaded && !previous.listingsLoaded) ||
+      (reservationsLoaded && !previous.reservationsLoaded) ||
+      (conversationsLoaded && !previous.conversationsLoaded);
+    loadedFlagsRef.current = { listingsLoaded, reservationsLoaded, conversationsLoaded };
     if (firstSync.current) {
       firstSync.current = false;
       return undefined;
     }
+    if (initialPopulation) return undefined;
     const timer = setTimeout(() => load({ background: true }), 250);
     return () => clearTimeout(timer);
-  }, [listings, reservations, conversations, load]);
+  }, [listings, reservations, conversations, listingsLoaded, reservationsLoaded, conversationsLoaded, load]);
 
   const property = filters?.property ?? null;
   const propertyKnown = !property || !listingsLoaded || listings.some((item) => item.id === property);

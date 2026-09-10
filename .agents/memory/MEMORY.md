@@ -5,3 +5,4 @@
 - [Putko legacy backend isolation](putko-legacy-backend-isolation.md) — patch the Render backend from an isolated origin/main worktree, never from the migrated app branch.
 - [Putko rebuild data platform](putko-rebuild-data-platform.md) — target external PostgreSQL/PostGIS while preserving legacy accommodation contracts through adapters.
 - [Putko Host rebuild rules](putko-host-rebuild.md) — plan location; URL-driven nav, single listings store, editor guards, calendar data split, shell layout quirks.
+- [Putko browser e2e](putko-e2e-playwright.md) — system Chromium + localhost:80 proxy, push dev DB schema first, keep Vite from watching e2e/ output.

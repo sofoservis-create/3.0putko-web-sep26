@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CalendarIcon, Info, Landmark, Link2, PauseCircle, Plus, Trash2 } from "lucide-react";
 import Link from "@/app/components/NextLink";
 import { fieldElementId, isHttpUrl } from "../../../host/hostEditorValidation";
@@ -402,6 +402,50 @@ function Policies({ data, errors, language, onChange }) {
   );
 }
 
+/**
+ * Inline (non-modal) confirmation shown before "connect" is switched to
+ * "manual only". Focus moves onto the confirmation when it opens, Escape
+ * keeps the links connected, and focus returns to the radio that opened it.
+ */
+function ManualSwitchConfirmation({ id, language, savedLinks, onKeep, onSwitch }) {
+  const keepRef = useRef(null);
+  const openerRef = useRef(null);
+  useEffect(() => {
+    openerRef.current = typeof document !== "undefined" ? document.activeElement : null;
+    keepRef.current?.focus();
+    return () => {
+      const opener = openerRef.current;
+      if (opener && typeof opener.focus === "function" && document.contains(opener)) opener.focus();
+    };
+  }, []);
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onKeep();
+    }
+  };
+  return (
+    <div role="group" aria-labelledby={id} onKeyDown={onKeyDown} className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <p id={id} role="alert" className="flex items-start gap-2 text-[13px] font-semibold leading-5 text-amber-900">
+        <PauseCircle size={16} className="mt-0.5 shrink-0" />
+        {t(
+          language,
+          `Switch to manual only? Your ${savedLinks} ${savedLinks === 1 ? "link stays" : "links stay"} saved but paused, and any dates imported from ${savedLinks === 1 ? "it open" : "them open"} up again for booking.`,
+          `Prepnúť len na manuálne? ${savedLinks === 1 ? "Váš odkaz zostane uložený, ale pozastavený" : `Vaše odkazy (${savedLinks}) zostanú uložené, ale pozastavené`} a termíny z ${savedLinks === 1 ? "neho" : "nich"} importované sa opäť uvoľnia na rezerváciu.`,
+        )}
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <button ref={keepRef} type="button" onClick={onKeep} className="min-h-11 flex-1 rounded-xl border border-neutral-300 bg-white px-4 text-[14px] font-bold text-[#1E3E2B]">
+          {t(language, "Keep connected", "Ponechať pripojené")}
+        </button>
+        <button type="button" onClick={onSwitch} className="min-h-11 flex-1 rounded-xl bg-amber-700 px-4 text-[14px] font-bold text-white">
+          {t(language, "Switch to manual", "Prepnúť na manuálne")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Calendar({ data, errors, language, setField, calendarLinkProps }) {
   const feeds = Array.isArray(data.calendarFeeds) ? data.calendarFeeds : [];
   const choice = data.calendarChoice === "connect" ? "connect" : data.calendarChoice === "none" ? "none" : "";
@@ -479,31 +523,16 @@ function Calendar({ data, errors, language, setField, calendarLinkProps }) {
         </div>
         <FieldError id={choiceErrorId} message={errors.calendarChoice} />
         {confirmManual && (
-          <div role="alertdialog" aria-labelledby={`${choiceId}-confirm`} className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p id={`${choiceId}-confirm`} className="flex items-start gap-2 text-[13px] font-semibold leading-5 text-amber-900">
-              <PauseCircle size={16} className="mt-0.5 shrink-0" />
-              {t(
-                language,
-                `Switch to manual only? Your ${savedLinks} ${savedLinks === 1 ? "link stays" : "links stay"} saved but paused, and any dates imported from ${savedLinks === 1 ? "it open" : "them open"} up again for booking.`,
-                `Prepnúť len na manuálne? ${savedLinks === 1 ? "Váš odkaz zostane uložený, ale pozastavený" : `Vaše odkazy (${savedLinks}) zostanú uložené, ale pozastavené`} a termíny z ${savedLinks === 1 ? "neho" : "nich"} importované sa opäť uvoľnia na rezerváciu.`,
-              )}
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <button type="button" onClick={() => setConfirmManual(false)} className="min-h-11 flex-1 rounded-xl border border-neutral-300 bg-white px-4 text-[14px] font-bold text-[#1E3E2B]">
-                {t(language, "Keep connected", "Ponechať pripojené")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmManual(false);
-                  setField("calendarChoice", "none");
-                }}
-                className="min-h-11 flex-1 rounded-xl bg-amber-700 px-4 text-[14px] font-bold text-white"
-              >
-                {t(language, "Switch to manual", "Prepnúť na manuálne")}
-              </button>
-            </div>
-          </div>
+          <ManualSwitchConfirmation
+            id={`${choiceId}-confirm`}
+            language={language}
+            savedLinks={savedLinks}
+            onKeep={() => setConfirmManual(false)}
+            onSwitch={() => {
+              setConfirmManual(false);
+              setField("calendarChoice", "none");
+            }}
+          />
         )}
       </fieldset>
 

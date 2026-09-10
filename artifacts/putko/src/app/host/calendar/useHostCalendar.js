@@ -10,6 +10,11 @@ import {
   updateHostCalendarFeed,
 } from "../../utlis/guestAccountApi";
 import { useHostListings } from "../HostListingsContext";
+import { createKeyedInFlight } from "../hostStoreUtils";
+
+// Module-level: a calendar page remounting (or two instances) for the same
+// property while its GET is still running shares that one request.
+const calendarLoads = createKeyedInFlight();
 
 /**
  * Availability state for exactly one property. The hook is bound to the
@@ -62,7 +67,7 @@ export function useHostCalendar(listingId) {
     setPhase("loading");
     setLoadError(null);
     try {
-      const next = await getHostCalendar(id);
+      const next = await calendarLoads(id, () => getHostCalendar(id));
       applySnapshot(id, next);
     } catch (error) {
       if (!isCurrent(id)) return;

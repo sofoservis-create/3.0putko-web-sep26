@@ -30,11 +30,13 @@ describe("Editor step 8 — manual only vs connected links", () => {
   it("asks before pausing saved links and keeps them when the host declines", () => {
     render(<Harness initial={withLinks} />);
     fireEvent.click(screen.getByLabelText(/manual only/i));
-    expect(screen.getByRole("alertdialog").textContent).toMatch(/2 links stay saved but paused/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/2 links stay saved but paused/i);
     expect(screen.getByTestId("choice").textContent).toBe("connect");
+    // Focus lands on the safe choice so keyboard users can answer at once.
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /keep connected/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /keep connected/i }));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("choice").textContent).toBe("connect");
     expect(screen.getByLabelText(/connect calendar links/i).checked).toBe(true);
   });
@@ -58,8 +60,22 @@ describe("Editor step 8 — manual only vs connected links", () => {
   it("switches to manual immediately when there is nothing to pause", () => {
     render(<Harness initial={{ calendarChoice: "connect", calendarFeeds: [{ label: "", url: "" }] }} />);
     fireEvent.click(screen.getByLabelText(/manual only/i));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("choice").textContent).toBe("none");
     expect(screen.getByText(/add calendar links later/i)).toBeTruthy();
+  });
+
+  it("Escape keeps the links connected and returns focus to the radio that opened the confirmation", () => {
+    render(<Harness initial={withLinks} />);
+    const manualRadio = screen.getByLabelText(/manual only/i);
+    manualRadio.focus();
+    fireEvent.click(manualRadio);
+    const keep = screen.getByRole("button", { name: /keep connected/i });
+    expect(document.activeElement).toBe(keep);
+
+    fireEvent.keyDown(keep, { key: "Escape" });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("choice").textContent).toBe("connect");
+    expect(document.activeElement).toBe(manualRadio);
   });
 });

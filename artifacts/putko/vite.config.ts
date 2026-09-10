@@ -60,6 +60,11 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Playwright writes traces/screenshots under e2e/; they must not trigger
+    // reloads in the app the suite is driving.
+    watch: {
+      ignored: ['**/e2e/**'],
+    },
   },
   preview: {
     port,

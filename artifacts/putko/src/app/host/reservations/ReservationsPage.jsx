@@ -254,7 +254,7 @@ export default function ReservationsPage({ filters, language }) {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setFilters({ stage: option })}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors ${
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors ${
                     active ? "border-[#1E3E2B] bg-[#1E3E2B] text-white" : "border-neutral-300 bg-white text-[#1E3E2B] hover:border-[#1E3E2B]"
                   }`}
                 >

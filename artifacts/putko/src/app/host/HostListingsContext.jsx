@@ -15,6 +15,7 @@ import {
   updateHostAccommodation,
 } from "../utlis/guestAccountApi";
 import { applyListingMutation, reconcileListingsSnapshot } from "./hostListingModel";
+import { DEFAULT_MAX_AGE_MS, isFresh, sameSnapshot } from "./hostStoreUtils";
 
 // One shared listings state for the whole Host workspace. Today, Listings,
 // the sidebar setup card, the menu, and the editor all read from here, so a
@@ -54,8 +55,17 @@ export function HostListingsProvider({ children }) {
     };
   }, []);
 
-  const refresh = useCallback(({ background = false } = {}) => {
+  const loadedAtRef = useRef(0);
+
+  /**
+   * Re-fetch the list. `background` keeps the current items on screen while
+   * loading; `maxAge` (ms) skips the request entirely when the last
+   * successful load is more recent, so section switches do not re-download
+   * an unchanged list. A refresh already in flight is shared, never doubled.
+   */
+  const refresh = useCallback(({ background = false, maxAge = 0 } = {}) => {
     if (inFlightRef.current) return inFlightRef.current;
+    if (background && isFresh(loadedAtRef.current, maxAge)) return Promise.resolve(null);
     const showAsBackground = background && loadedRef.current;
     if (showAsBackground) setRefreshing(true);
     else setLoading(true);
@@ -69,7 +79,8 @@ export function HostListingsProvider({ children }) {
           result?.accommodations || [],
           pendingMutationsRef.current,
         );
-        setItems(next);
+        setItems((current) => sameSnapshot(current, next));
+        loadedAtRef.current = Date.now();
         loadedRef.current = true;
         setLoaded(true);
         return next;

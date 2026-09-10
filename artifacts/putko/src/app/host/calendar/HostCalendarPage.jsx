@@ -248,7 +248,7 @@ export default function HostCalendarPage({ listingId, language }) {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setView(option.key)}
-                className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-4 text-[13px] font-bold transition-colors ${active ? "bg-white text-[#1E3E2B] shadow-sm" : "text-neutral-500"}`}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-4 text-[13px] font-bold transition-colors ${active ? "bg-white text-[#1E3E2B] shadow-sm" : "text-neutral-500"}`}
               >
                 <option.icon size={16} /> {option.label}
               </button>
@@ -256,7 +256,7 @@ export default function HostCalendarPage({ listingId, language }) {
           })}
         </div>
         {view === "month" && !isSameMonth(month, currentMonth) && (
-          <button type="button" onClick={() => setMonth(currentMonth)} className="min-h-10 rounded-lg px-3 text-[13px] font-bold text-[#1E3E2B] underline decoration-[#DFBA73] decoration-2 underline-offset-4">
+          <button type="button" onClick={() => setMonth(currentMonth)} className="min-h-11 rounded-lg px-3 text-[13px] font-bold text-[#1E3E2B] underline decoration-[#DFBA73] decoration-2 underline-offset-4">
             {t(language, "Today", "Dnes")}
           </button>
         )}
@@ -373,7 +373,7 @@ export default function HostCalendarPage({ listingId, language }) {
                     : t(language, "Now tap the last day (or the same day again).", "Teraz ťuknite na posledný deň (alebo znova na ten istý).")}
                 </p>
               </div>
-              <button type="button" onClick={clearSelection} disabled={rangeBusy} aria-label={t(language, "Clear selection", "Zrušiť výber")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100">
+              <button type="button" onClick={clearSelection} disabled={rangeBusy} aria-label={t(language, "Clear selection", "Zrušiť výber")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100">
                 <X size={18} />
               </button>
             </div>
