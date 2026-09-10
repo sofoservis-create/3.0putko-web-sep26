@@ -136,6 +136,32 @@ export const createHostReservationFixtures = (accommodationId) =>
 export const getHostProfile = () => testGuestRequest("/host-profile");
 export const saveHostProfile = (profile) =>
   testGuestRequest("/host-profile", { method: "PUT", body: JSON.stringify(profile) });
+export const prepareHostProfilePhoto = async (file, crop) => {
+  const request = await testGuestRequest("/host-profile-photo/upload-url", {
+    method: "POST",
+    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+  });
+  const upload = await fetch(request.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!upload.ok) {
+    const error = new Error("Photo upload failed");
+    error.status = upload.status;
+    error.code = "uploadFailed";
+    throw error;
+  }
+  return testGuestRequest("/host-profile-photo/prepare", {
+    method: "POST",
+    body: JSON.stringify({ objectPath: request.objectPath, crop }),
+  });
+};
+export const discardHostProfilePhoto = (avatarUrl) => {
+  const match = avatarUrl?.match(/\/host-profile-photo\/[0-9a-f-]+\/([0-9a-f-]+)\/avatar\.webp$/);
+  if (!match) return Promise.resolve();
+  return testGuestRequest(`/host-profile-photo/${encodeURIComponent(match[1])}`, { method: "DELETE" });
+};
 export const getHostPayoutReadiness = () => testGuestRequest("/host-payouts");
 
 // Messages (development Host workspace). Threads are participant-only on the

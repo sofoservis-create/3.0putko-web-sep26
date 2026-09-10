@@ -84,6 +84,9 @@ export const isHttpUrl = (value) => {
   }
 };
 
+export const isManagedAvatarUrl = (value) =>
+  /^\/api\/test-auth\/host-profile-photo\/[0-9a-f-]+\/[0-9a-f-]+\/avatar\.webp$/.test(value);
+
 export const fieldErrorMessage = (field, code, language) => {
   switch (`${field}.${code}`) {
     case "displayName.required":
@@ -114,7 +117,7 @@ export const validateProfile = (values, language) => {
   if (!body.displayName) errors.displayName = fieldErrorMessage("displayName", "required", language);
   else if (body.displayName.length < DISPLAY_NAME_MIN) errors.displayName = fieldErrorMessage("displayName", "tooShort", language);
   else if (body.displayName.length > DISPLAY_NAME_MAX) errors.displayName = fieldErrorMessage("displayName", "tooLong", language);
-  if (body.avatarUrl && !isHttpUrl(body.avatarUrl)) errors.avatarUrl = fieldErrorMessage("avatarUrl", "invalidUrl", language);
+  if (body.avatarUrl && !isHttpUrl(body.avatarUrl) && !isManagedAvatarUrl(body.avatarUrl)) errors.avatarUrl = fieldErrorMessage("avatarUrl", "invalidUrl", language);
   if (body.about.length > ABOUT_MAX) errors.about = fieldErrorMessage("about", "tooLong", language);
   if (body.languages.length > MAX_LANGUAGES) errors.languages = fieldErrorMessage("languages", "tooMany", language);
   return errors;

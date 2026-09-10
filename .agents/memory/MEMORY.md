@@ -6,3 +6,4 @@
 - [Putko rebuild data platform](putko-rebuild-data-platform.md) — target external PostgreSQL/PostGIS while preserving legacy accommodation contracts through adapters.
 - [Putko Host rebuild rules](putko-host-rebuild.md) — plan location; URL-driven nav, single listings store, editor guards, calendar data split, shell layout quirks.
 - [Putko browser e2e](putko-e2e-playwright.md) — system Chromium + localhost:80 proxy, push dev DB schema first, keep Vite from watching e2e/ output.
+- [OpenAPI Zod v3 compatibility](openapi-zod-v3.md) — avoid schema formats that Orval turns into Zod v4-only top-level helpers.

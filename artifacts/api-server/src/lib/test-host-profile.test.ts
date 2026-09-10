@@ -10,7 +10,7 @@ import {
 
 const valid = {
   displayName: "  Jana   Nováková ",
-  avatarUrl: "https://example.com/jana.jpg",
+  avatarUrl: null,
   about: "  Welcome to the Tatras.\r\n\r\nWe love hiking. ",
   languages: ["en", "sk", "sk"],
   responseTime: "within_day",
@@ -23,7 +23,7 @@ describe("validateHostProfileInput", () => {
     if (!result.ok) return;
     assert.deepEqual(result.value, {
       displayName: "Jana Nováková",
-      avatarUrl: "https://example.com/jana.jpg",
+      avatarUrl: null,
       about: "Welcome to the Tatras.\n\nWe love hiking.",
       // De-duplicated and returned in the canonical picker order.
       languages: ["sk", "en"],
@@ -46,17 +46,29 @@ describe("validateHostProfileInput", () => {
     });
   });
 
-  it("treats an empty avatar as none and rejects non-http URLs", () => {
+  it("treats an empty avatar as none and rejects unmanaged URLs", () => {
     const empty = validateHostProfileInput({ ...valid, avatarUrl: "   " });
     assert.equal(empty.ok && empty.value.avatarUrl, null);
     const missing = validateHostProfileInput({ ...valid, avatarUrl: undefined });
     assert.equal(missing.ok && missing.value.avatarUrl, null);
-    for (const bad of ["javascript:alert(1)", "ftp://x/y.png", "not a url", "data:image/png;base64,AAAA"]) {
+    for (const bad of ["https://example.com/a.jpg", "javascript:alert(1)", "ftp://x/y.png", "not a url", "data:image/png;base64,AAAA"]) {
       assert.deepEqual(validateHostProfileInput({ ...valid, avatarUrl: bad }), {
         ok: false,
         errors: [{ field: "avatarUrl", code: "invalidUrl" }],
       }, bad);
     }
+  });
+
+  it("accepts managed photos only for their authenticated owner", () => {
+    const owner = "11111111-1111-1111-1111-111111111111";
+    const other = "22222222-2222-2222-2222-222222222222";
+    const avatarUrl = `/api/test-auth/host-profile-photo/${owner}/33333333-3333-3333-3333-333333333333/avatar.webp`;
+    const accepted = validateHostProfileInput({ ...valid, avatarUrl }, owner);
+    assert.equal(accepted.ok && accepted.value.avatarUrl, avatarUrl);
+    assert.deepEqual(validateHostProfileInput({ ...valid, avatarUrl }, other), {
+      ok: false,
+      errors: [{ field: "avatarUrl", code: "invalidUrl" }],
+    });
   });
 
   it("caps the about text and rejects unknown languages or response times", () => {

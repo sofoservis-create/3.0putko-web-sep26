@@ -24,6 +24,10 @@ import type {
   DestinationCatalogResponse,
   DestinationSearchResponse,
   HealthStatus,
+  HostProfilePhotoPrepareInput,
+  HostProfilePhotoPrepareResponse,
+  HostProfilePhotoUploadInput,
+  HostProfilePhotoUploadResponse,
   PopularDestinationsResponse,
   TestGuest,
   TestGuestFavoriteInput,
@@ -1241,5 +1245,305 @@ export const useRemoveTestGuestFavorite = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRemoveTestGuestFavoriteMutationOptions(options));
+    }
+
+export const getRequestHostProfilePhotoUploadUrl = () => {
+
+
+
+
+  return `/api/test-auth/host-profile-photo/upload-url`
+}
+
+/**
+ * @summary Request an authenticated direct-upload URL for a Host profile photo
+ */
+export const requestHostProfilePhotoUpload = async (hostProfilePhotoUploadInput: HostProfilePhotoUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<HostProfilePhotoUploadResponse> => {
+
+  return customFetch<HostProfilePhotoUploadResponse>(getRequestHostProfilePhotoUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(hostProfilePhotoUploadInput)
+  }
+);}
+
+
+
+
+
+export const getRequestHostProfilePhotoUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>, TError,{data: BodyType<HostProfilePhotoUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>, TError,{data: BodyType<HostProfilePhotoUploadInput>}, TContext> => {
+
+const mutationKey = ['requestHostProfilePhotoUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>, {data: BodyType<HostProfilePhotoUploadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestHostProfilePhotoUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestHostProfilePhotoUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>>
+    export type RequestHostProfilePhotoUploadMutationBody = BodyType<HostProfilePhotoUploadInput>
+    export type RequestHostProfilePhotoUploadMutationError = ErrorType<void>
+
+    /**
+ * @summary Request an authenticated direct-upload URL for a Host profile photo
+ */
+export const useRequestHostProfilePhotoUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>, TError,{data: BodyType<HostProfilePhotoUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestHostProfilePhotoUpload>>,
+        TError,
+        {data: BodyType<HostProfilePhotoUploadInput>},
+        TContext
+      > => {
+      return useMutation(getRequestHostProfilePhotoUploadMutationOptions(options));
+    }
+
+export const getPrepareHostProfilePhotoUrl = () => {
+
+
+
+
+  return `/api/test-auth/host-profile-photo/prepare`
+}
+
+/**
+ * @summary Validate, orient, crop and resize an uploaded Host profile photo
+ */
+export const prepareHostProfilePhoto = async (hostProfilePhotoPrepareInput: HostProfilePhotoPrepareInput, options?: Parameters<typeof customFetch>[1]): Promise<HostProfilePhotoPrepareResponse> => {
+
+  return customFetch<HostProfilePhotoPrepareResponse>(getPrepareHostProfilePhotoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(hostProfilePhotoPrepareInput)
+  }
+);}
+
+
+
+
+
+export const getPrepareHostProfilePhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareHostProfilePhoto>>, TError,{data: BodyType<HostProfilePhotoPrepareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof prepareHostProfilePhoto>>, TError,{data: BodyType<HostProfilePhotoPrepareInput>}, TContext> => {
+
+const mutationKey = ['prepareHostProfilePhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof prepareHostProfilePhoto>>, {data: BodyType<HostProfilePhotoPrepareInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  prepareHostProfilePhoto(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrepareHostProfilePhotoMutationResult = NonNullable<Awaited<ReturnType<typeof prepareHostProfilePhoto>>>
+    export type PrepareHostProfilePhotoMutationBody = BodyType<HostProfilePhotoPrepareInput>
+    export type PrepareHostProfilePhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Validate, orient, crop and resize an uploaded Host profile photo
+ */
+export const usePrepareHostProfilePhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareHostProfilePhoto>>, TError,{data: BodyType<HostProfilePhotoPrepareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof prepareHostProfilePhoto>>,
+        TError,
+        {data: BodyType<HostProfilePhotoPrepareInput>},
+        TContext
+      > => {
+      return useMutation(getPrepareHostProfilePhotoMutationOptions(options));
+    }
+
+export const getGetHostProfilePhotoUrl = (guestId: string,
+    version: string,
+    file: 'avatar.webp' | 'profile.webp',) => {
+
+
+
+
+  return `/api/test-auth/host-profile-photo/${guestId}/${version}/${file}`
+}
+
+/**
+ * @summary Serve an immutable public Host profile image variant
+ */
+export const getHostProfilePhoto = async (guestId: string,
+    version: string,
+    file: 'avatar.webp' | 'profile.webp', options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetHostProfilePhotoUrl(guestId,version,file),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHostProfilePhotoQueryKey = (guestId: string,
+    version: string,
+    file: 'avatar.webp' | 'profile.webp',) => {
+    return [
+    `/api/test-auth/host-profile-photo/${guestId}/${version}/${file}`
+    ] as const;
+    }
+
+
+export const getGetHostProfilePhotoQueryOptions = <TData = Awaited<ReturnType<typeof getHostProfilePhoto>>, TError = ErrorType<void>>(guestId: string,
+    version: string,
+    file: 'avatar.webp' | 'profile.webp', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHostProfilePhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHostProfilePhotoQueryKey(guestId,version,file);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHostProfilePhoto>>> = ({ signal }) => getHostProfilePhoto(guestId,version,file, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: guestId !== null && guestId !== undefined && version !== null && version !== undefined && file !== null && file !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHostProfilePhoto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHostProfilePhotoQueryResult = NonNullable<Awaited<ReturnType<typeof getHostProfilePhoto>>>
+export type GetHostProfilePhotoQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve an immutable public Host profile image variant
+ */
+
+export function useGetHostProfilePhoto<TData = Awaited<ReturnType<typeof getHostProfilePhoto>>, TError = ErrorType<void>>(
+ guestId: string,
+    version: string,
+    file: 'avatar.webp' | 'profile.webp', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHostProfilePhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHostProfilePhotoQueryOptions(guestId,version,file,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDiscardHostProfilePhotoUrl = (version: string,) => {
+
+
+
+
+  return `/api/test-auth/host-profile-photo/${version}`
+}
+
+/**
+ * @summary Discard a prepared photo that is not the host's active profile photo
+ */
+export const discardHostProfilePhoto = async (version: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDiscardHostProfilePhotoUrl(version),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDiscardHostProfilePhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof discardHostProfilePhoto>>, TError,{version: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof discardHostProfilePhoto>>, TError,{version: string}, TContext> => {
+
+const mutationKey = ['discardHostProfilePhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof discardHostProfilePhoto>>, {version: string}> = (props) => {
+          const {version} = props ?? {};
+
+          return  discardHostProfilePhoto(version,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DiscardHostProfilePhotoMutationResult = NonNullable<Awaited<ReturnType<typeof discardHostProfilePhoto>>>
+
+    export type DiscardHostProfilePhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Discard a prepared photo that is not the host's active profile photo
+ */
+export const useDiscardHostProfilePhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof discardHostProfilePhoto>>, TError,{version: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof discardHostProfilePhoto>>,
+        TError,
+        {version: string},
+        TContext
+      > => {
+      return useMutation(getDiscardHostProfilePhotoMutationOptions(options));
     }
 

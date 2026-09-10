@@ -353,8 +353,120 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TestGuestFavorites"
+  /test-auth/host-profile-photo/upload-url:
+    post:
+      operationId: requestHostProfilePhotoUpload
+      tags: [test-auth]
+      summary: Request an authenticated direct-upload URL for a Host profile photo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostProfilePhotoUploadInput"
+      responses:
+        "200":
+          description: Upload URL and host-owned staging object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfilePhotoUploadResponse"
+        "400":
+          description: Unsupported image format
+        "401":
+          description: Invalid or expired session
+        "413":
+          description: Image exceeds the size limit
+  /test-auth/host-profile-photo/prepare:
+    post:
+      operationId: prepareHostProfilePhoto
+      tags: [test-auth]
+      summary: Validate, orient, crop and resize an uploaded Host profile photo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostProfilePhotoPrepareInput"
+      responses:
+        "200":
+          description: Managed photo variants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostProfilePhotoPrepareResponse"
+        "400":
+          description: Invalid or corrupt image
+        "401":
+          description: Invalid or expired session
+        "403":
+          description: Staging image belongs to another host
+        "413":
+          description: Uploaded image exceeds the size limit
+  /test-auth/host-profile-photo/{guestId}/{version}/{file}:
+    get:
+      operationId: getHostProfilePhoto
+      tags: [test-auth]
+      summary: Serve an immutable public Host profile image variant
+      parameters:
+        - { name: guestId, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: file, in: path, required: true, schema: { type: string, enum: [avatar.webp, profile.webp] } }
+      responses:
+        "200":
+          description: WebP profile image
+          content:
+            image/webp:
+              schema: { type: string, contentEncoding: binary }
+        "404":
+          description: Image not found
+  /test-auth/host-profile-photo/{version}:
+    delete:
+      operationId: discardHostProfilePhoto
+      tags: [test-auth]
+      summary: Discard a prepared photo that is not the host's active profile photo
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "204":
+          description: Prepared image removed
+        "401":
+          description: Invalid or expired session
+        "409":
+          description: The image is the active profile photo
 components:
   schemas:
+    HostProfilePhotoUploadInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: number, minimum: 1, maximum: 12582912 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp, image/heic, image/heif] }
+    HostProfilePhotoUploadResponse:
+      type: object
+      required: [uploadUrl, objectPath]
+      properties:
+        uploadUrl: { type: string }
+        objectPath: { type: string }
+    HostProfilePhotoPrepareInput:
+      type: object
+      required: [objectPath, crop]
+      properties:
+        objectPath: { type: string }
+        crop:
+          type: object
+          required: [x, y, size]
+          properties:
+            x: { type: number, minimum: 0, maximum: 1 }
+            y: { type: number, minimum: 0, maximum: 1 }
+            size: { type: number, minimum: 0, maximum: 1 }
+    HostProfilePhotoPrepareResponse:
+      type: object
+      required: [avatarUrl, profileUrl]
+      properties:
+        avatarUrl: { type: string }
+        profileUrl: { type: string }
     DestinationCenter:
       type: object
       required: [latitude, longitude]

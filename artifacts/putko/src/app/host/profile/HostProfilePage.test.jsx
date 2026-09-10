@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../utlis/guestAccountApi", () => ({
   getHostProfile: vi.fn(),
   saveHostProfile: vi.fn(),
+  prepareHostProfilePhoto: vi.fn(),
+  discardHostProfilePhoto: vi.fn(() => Promise.resolve()),
 }));
 
-import { getHostProfile, saveHostProfile } from "../../utlis/guestAccountApi";
+import { discardHostProfilePhoto, getHostProfile, prepareHostProfilePhoto, saveHostProfile } from "../../utlis/guestAccountApi";
 import HostProfilePage from "./HostProfilePage";
 
 const deferred = () => {
@@ -37,8 +39,18 @@ const clickSave = () => fireEvent.click(screen.getByRole("button", { name: /Save
 beforeEach(() => {
   getHostProfile.mockReset();
   saveHostProfile.mockReset();
+  prepareHostProfilePhoto.mockReset();
+  discardHostProfilePhoto.mockClear();
+  vi.stubGlobal("URL", {
+    ...URL,
+    createObjectURL: vi.fn(() => "blob:photo"),
+    revokeObjectURL: vi.fn(),
+  });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("HostProfilePage save lifecycle", () => {
   it("persists the first save even when the suggested default is accepted unchanged", async () => {
@@ -112,18 +124,63 @@ describe("HostProfilePage save lifecycle", () => {
     expect(saveHostProfile).toHaveBeenCalledTimes(2);
   });
 
-  it("maps server field errors onto the form", async () => {
+  it("removes the raw photo URL input", async () => {
     getHostProfile.mockResolvedValue({ profile: persisted });
-    saveHostProfile.mockRejectedValueOnce(
-      Object.assign(new Error("Invalid host profile"), { status: 400, data: { errors: [{ field: "avatarUrl", code: "invalidUrl" }] } }),
-    );
+    await renderPage();
+    expect(screen.queryByLabelText("Profile photo link")).toBeNull();
+    expect(screen.getByRole("button", { name: "Take photo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Choose photo" })).toBeTruthy();
+  });
+
+  it("prepares a chosen photo and saves its managed reference without losing other edits", async () => {
+    const avatarUrl = "/api/test-auth/host-profile-photo/11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222/avatar.webp";
+    getHostProfile.mockResolvedValue({ profile: persisted });
+    prepareHostProfilePhoto.mockResolvedValue({ avatarUrl, profileUrl: avatarUrl.replace("avatar.webp", "profile.webp") });
+    saveHostProfile.mockResolvedValue({ profile: { ...persisted, about: "Welcome", avatarUrl, savedAt: "2026-09-10T03:00:00.000Z" } });
+    await renderPage();
+    fireEvent.change(screen.getByLabelText("About you"), { target: { value: "Welcome" } });
+
+    const gallery = document.querySelector('input[type="file"]:not([capture])');
+    const file = new File(["photo"], "host.jpg", { type: "image/jpeg" });
+    fireEvent.change(gallery, { target: { files: [file] } });
+    await screen.findByRole("dialog", { name: "Crop profile photo" });
+    fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
+
+    await waitFor(() => expect(prepareHostProfilePhoto).toHaveBeenCalledWith(file, { x: 0.5, y: 0.5, size: 1 }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByLabelText("About you").value).toBe("Welcome");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save profile" }).disabled).toBe(false));
+    clickSave();
+    await waitFor(() => expect(saveHostProfile).toHaveBeenCalledWith(expect.objectContaining({ avatarUrl, about: "Welcome" })));
+  });
+
+  it("locks photo removal while a save referencing the prepared draft is in flight", async () => {
+    const avatarUrl = "/api/test-auth/host-profile-photo/11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222/avatar.webp";
+    const pending = deferred();
+    getHostProfile.mockResolvedValue({ profile: persisted });
+    prepareHostProfilePhoto.mockResolvedValue({ avatarUrl, profileUrl: avatarUrl.replace("avatar.webp", "profile.webp") });
+    saveHostProfile.mockReturnValue(pending.promise);
     await renderPage();
 
-    // Passes client validation but the server rejects it.
-    fireEvent.change(screen.getByLabelText("Profile photo link"), { target: { value: "https://example.com/not-an-image" } });
-    clickSave();
+    const gallery = document.querySelector('input[type="file"]:not([capture])');
+    const file = new File(["photo"], "host.jpg", { type: "image/jpeg" });
+    fireEvent.change(gallery, { target: { files: [file] } });
+    await screen.findByRole("dialog", { name: "Crop profile photo" });
+    fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save profile" }).disabled).toBe(false));
 
-    await screen.findByText("Enter a full image link starting with https://.");
-    await screen.findByText("Fix the highlighted fields, then save again.");
+    clickSave();
+    await screen.findByText("Saving your profile…");
+    const remove = screen.getByRole("button", { name: "Remove" });
+    expect(remove.disabled).toBe(true);
+    fireEvent.click(remove);
+    expect(discardHostProfilePhoto).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve({ profile: { ...persisted, avatarUrl, savedAt: "2026-09-10T03:10:00.000Z" } });
+    });
+    await savedStatus();
+    expect(screen.getByRole("button", { name: "Remove" }).disabled).toBe(false);
   });
 });

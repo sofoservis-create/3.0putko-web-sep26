@@ -1,4 +1,5 @@
 import type { TestGuest, TestHostAccommodation, TestHostProfile } from "@workspace/db";
+import { managedPhotoOwner } from "./host-profile-storage.ts";
 
 /**
  * Public Host Profile and host-level payout readiness.
@@ -65,7 +66,7 @@ export const isAcceptableImageUrl = (value: string) => {
   return (parsed.protocol === "https:" || parsed.protocol === "http:") && Boolean(parsed.hostname);
 };
 
-export const validateHostProfileInput = (body: unknown): HostProfileValidation => {
+export const validateHostProfileInput = (body: unknown, authenticatedGuestId?: string): HostProfileValidation => {
   const errors: HostProfileFieldError[] = [];
   const source = isRecord(body) ? body : {};
 
@@ -77,7 +78,8 @@ export const validateHostProfileInput = (body: unknown): HostProfileValidation =
   const rawAvatar = typeof source.avatarUrl === "string" ? source.avatarUrl.trim() : "";
   let avatarUrl: string | null = null;
   if (rawAvatar) {
-    if (isAcceptableImageUrl(rawAvatar)) avatarUrl = rawAvatar;
+    const managed = managedPhotoOwner(rawAvatar);
+    if (managed && managed.guestId === authenticatedGuestId) avatarUrl = rawAvatar;
     else errors.push({ field: "avatarUrl", code: "invalidUrl" });
   } else if (source.avatarUrl != null && typeof source.avatarUrl !== "string") {
     errors.push({ field: "avatarUrl", code: "invalidUrl" });

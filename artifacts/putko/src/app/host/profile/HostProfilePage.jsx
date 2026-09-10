@@ -9,7 +9,6 @@ import {
   RESPONSE_TIMES,
   emptyProfile,
   errorsFromResponse,
-  isHttpUrl,
   isProfileDirty,
   profileErrorText,
   profileInitial,
@@ -18,6 +17,7 @@ import {
   toRequestBody,
   validateProfile,
 } from "./hostProfileModel";
+import HostProfilePhotoField from "./HostProfilePhotoField";
 
 const t = (language, en, sk) => (language === "en" ? en : sk);
 
@@ -48,6 +48,7 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
   const [attempted, setAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState({});
   const [save, setSave] = useState({ phase: "idle", error: null });
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const mountedRef = useRef(true);
   const saveSeqRef = useRef(0);
@@ -102,7 +103,7 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
 
   /** Returns true when the profile is persisted (also when nothing changed). */
   const runSave = useCallback(async () => {
-    if (saveRef.current.phase === "saving") return false;
+    if (saveRef.current.phase === "saving" || photoBusy) return false;
     const current = valuesRef.current;
     setAttempted(true);
     if (Object.keys(validateProfile(current, language)).length > 0) {
@@ -136,7 +137,7 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
       setSave({ phase: "failed", error });
       return false;
     }
-  }, [language]);
+  }, [language, photoBusy]);
 
   useLeaveGuard({
     subject: "profile",
@@ -181,7 +182,7 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
   }
 
   const previewAvatar = values.avatarUrl.trim();
-  const showAvatar = previewAvatar && isHttpUrl(previewAvatar) && !errors.avatarUrl;
+  const showAvatar = previewAvatar && !errors.avatarUrl;
   const aboutLength = values.about.length;
   const savedAtText = formatSavedAt(savedAt, language);
 
@@ -237,17 +238,14 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
           autoComplete="nickname"
         />
 
-        <TextField
-          name="avatarUrl"
-          label={t(language, "Profile photo link", "Odkaz na profilovú fotku")}
-          hint={t(language, "Optional. A full https:// link to a photo of you or your place. Uploading from your phone comes with photo storage.", "Nepovinné. Úplný odkaz https:// na vašu fotku alebo fotku vášho miesta. Nahrávanie z telefónu príde spolu s úložiskom fotiek.")}
-          error={errors.avatarUrl}
+        <HostProfilePhotoField
+          language={language}
           value={values.avatarUrl}
-          onChange={onInput("avatarUrl")}
-          type="url"
-          inputMode="url"
-          placeholder="https://"
-          autoComplete="off"
+          persistedValue={baseline.avatarUrl}
+          disabled={save.phase === "saving"}
+          fallback={profileInitial(values)}
+          onChange={(value) => setField("avatarUrl", value)}
+          onBusyChange={setPhotoBusy}
         />
 
         <div>
@@ -309,7 +307,7 @@ export default function HostProfilePage({ language, onOpenAccount, openingAccoun
           <SaveFeedback phase={save.phase} error={save.error} dirty={dirty} savedAtText={savedAtText} hasFieldErrors={Object.values(errors).some(Boolean)} language={language} />
           <button
             type="submit"
-            disabled={save.phase === "saving"}
+            disabled={save.phase === "saving" || photoBusy}
             aria-busy={save.phase === "saving" || undefined}
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#1E3E2B] px-6 text-[15px] font-bold text-white transition-colors hover:bg-[#163021] disabled:cursor-not-allowed disabled:opacity-60"
           >

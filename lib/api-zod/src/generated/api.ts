@@ -342,3 +342,75 @@ export const RemoveTestGuestFavoriteResponse = zod.object({
 })
 
 
+/**
+ * @summary Request an authenticated direct-upload URL for a Host profile photo
+ */
+export const requestHostProfilePhotoUploadBodyNameMax = 255;
+
+export const requestHostProfilePhotoUploadBodySizeMax = 12582912;
+
+
+
+export const RequestHostProfilePhotoUploadBody = zod.object({
+  "name": zod.string().min(1).max(requestHostProfilePhotoUploadBodyNameMax),
+  "size": zod.number().min(1).max(requestHostProfilePhotoUploadBodySizeMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
+})
+
+export const RequestHostProfilePhotoUploadResponse = zod.object({
+  "uploadUrl": zod.string(),
+  "objectPath": zod.string()
+})
+
+
+/**
+ * @summary Validate, orient, crop and resize an uploaded Host profile photo
+ */
+export const prepareHostProfilePhotoBodyCropXMin = 0;
+export const prepareHostProfilePhotoBodyCropXMax = 1;
+
+export const prepareHostProfilePhotoBodyCropYMin = 0;
+export const prepareHostProfilePhotoBodyCropYMax = 1;
+
+export const prepareHostProfilePhotoBodyCropSizeMin = 0;
+export const prepareHostProfilePhotoBodyCropSizeMax = 1;
+
+
+
+export const PrepareHostProfilePhotoBody = zod.object({
+  "objectPath": zod.string(),
+  "crop": zod.object({
+  "x": zod.number().min(prepareHostProfilePhotoBodyCropXMin).max(prepareHostProfilePhotoBodyCropXMax),
+  "y": zod.number().min(prepareHostProfilePhotoBodyCropYMin).max(prepareHostProfilePhotoBodyCropYMax),
+  "size": zod.number().min(prepareHostProfilePhotoBodyCropSizeMin).max(prepareHostProfilePhotoBodyCropSizeMax)
+})
+})
+
+export const PrepareHostProfilePhotoResponse = zod.object({
+  "avatarUrl": zod.string(),
+  "profileUrl": zod.string()
+})
+
+
+/**
+ * @summary Serve an immutable public Host profile image variant
+ */
+export const GetHostProfilePhotoParams = zod.object({
+  "guestId": zod.coerce.string(),
+  "version": zod.coerce.string(),
+  "file": zod.enum(['avatar.webp', 'profile.webp'])
+})
+
+export const GetHostProfilePhotoResponse = zod.unknown()
+
+
+/**
+ * @summary Discard a prepared photo that is not the host's active profile photo
+ */
+export const DiscardHostProfilePhotoParams = zod.object({
+  "version": zod.coerce.string()
+})
+
+export const DiscardHostProfilePhotoResponse = zod.void()
+
+

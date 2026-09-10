@@ -5,6 +5,64 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type HostProfilePhotoUploadInputContentType = typeof HostProfilePhotoUploadInputContentType[keyof typeof HostProfilePhotoUploadInputContentType];
+
+
+export const HostProfilePhotoUploadInputContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+  'image/heic': 'image/heic',
+  'image/heif': 'image/heif',
+} as const;
+
+export interface HostProfilePhotoUploadInput {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 12582912
+     */
+  size: number;
+  contentType: HostProfilePhotoUploadInputContentType;
+}
+
+export interface HostProfilePhotoUploadResponse {
+  uploadUrl: string;
+  objectPath: string;
+}
+
+export type HostProfilePhotoPrepareInputCrop = {
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  x: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  y: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  size: number;
+};
+
+export interface HostProfilePhotoPrepareInput {
+  objectPath: string;
+  crop: HostProfilePhotoPrepareInputCrop;
+}
+
+export interface HostProfilePhotoPrepareResponse {
+  avatarUrl: string;
+  profileUrl: string;
+}
+
 export interface DestinationCenter {
   latitude: number;
   longitude: number;
